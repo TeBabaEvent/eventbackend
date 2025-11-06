@@ -1,51 +1,158 @@
 """Application FastAPI principale"""
-from fastapi import FastAPI
+import logging
+from contextlib import asynccontextmanager
+from datetime import datetime
+
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from fastapi.exceptions import RequestValidationError
+from sqlalchemy import text
 
 from app.core.config import settings
 from app.api.v1.router import api_router
+from app.db.database import engine
+
+# Configuration du logging
+logging.basicConfig(
+    level=logging.INFO if settings.is_production else logging.DEBUG,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Gestionnaire du cycle de vie de l'application"""
+    # Startup
+    logger.info(f"🚀 Démarrage de l'API Tebaba en mode {settings.environment}")
+    logger.info(f"🌐 CORS Origins: {settings.cors_origins}")
+    
+    try:
+        # Migration automatique (vérification et synchronisation du schéma)
+        from app.db.migrations import auto_migrate
+        auto_migrate()
+        logger.info("✅ Base de données initialisée avec succès")
+    except Exception as e:
+        logger.error(f"❌ Erreur lors de l'initialisation de la base de données: {e}")
+        raise
+    
+    yield
+    
+    # Shutdown
+    logger.info("🛑 Arrêt de l'API Tebaba")
+    engine.dispose()
+
 
 # Création de l'application FastAPI
 app = FastAPI(
     title="Tebaba Backend API",
     description="API Backend pour l'application Tebaba",
-    version="1.0.0"
+    version="1.0.0",
+    docs_url="/docs" if not settings.is_production else None,
+    redoc_url="/redoc" if not settings.is_production else None,
+    lifespan=lifespan
 )
 
+
 # Configuration CORS
+origins = [origin.strip() for origin in settings.cors_origins.split(",") if origin.strip()]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.cors_origins.split(","),
+    allow_origins=origins if origins else ["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 
-# Event: Initialisation de la base de données au démarrage
-@app.on_event("startup")
-async def startup_event():
-    """Initialiser la base de données au démarrage"""
-    try:
-        # Migration automatique (vérification et synchronisation du schéma)
-        from app.db.migrations import auto_migrate
-        auto_migrate()
-    except Exception as e:
-        print(f"✗ Erreur lors de l'initialisation: {e}")
-        raise
+# Middleware pour logger les requêtes
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    """Logger toutes les requêtes HTTP"""
+    start_time = datetime.now()
+    
+    # Log de la requête entrante
+    logger.info(f"➡️  {request.method} {request.url.path}")
+    
+    response = await call_next(request)
+    
+    # Log de la réponse
+    process_time = (datetime.now() - start_time).total_seconds()
+    logger.info(
+        f"⬅️  {request.method} {request.url.path} "
+        f"- Status: {response.status_code} - Time: {process_time:.3f}s"
+    )
+    
+    return response
+
+
+# Gestionnaire d'erreurs de validation
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    """Gérer les erreurs de validation"""
+    logger.warning(f"❌ Erreur de validation sur {request.url.path}: {exc.errors()}")
+    return JSONResponse(
+        status_code=422,
+        content={
+            "detail": exc.errors(),
+            "message": "Erreur de validation des données"
+        }
+    )
+
+
+# Gestionnaire d'erreurs génériques
+@app.exception_handler(Exception)
+async def generic_exception_handler(request: Request, exc: Exception):
+    """Gérer les erreurs non capturées"""
+    logger.error(f"❌ Erreur non gérée sur {request.url.path}: {str(exc)}", exc_info=True)
+    return JSONResponse(
+        status_code=500,
+        content={
+            "message": "Une erreur interne est survenue",
+            "detail": str(exc) if settings.debug else "Erreur interne du serveur"
+        }
+    )
 
 
 # Routes de base
 @app.get("/")
 async def root():
     """Route de base"""
-    return {"message": "Bienvenue sur l'API Tebaba"}
+    return {
+        "message": "Bienvenue sur l'API Tebaba",
+        "version": "1.0.0",
+        "environment": settings.environment,
+        "status": "online"
+    }
 
 
 @app.get("/health")
 async def health_check():
-    """Vérification de l'état de l'API"""
-    return {"status": "healthy"}
+    """Vérification de l'état de l'API et de la connexion à la base de données"""
+    try:
+        # Vérifier la connexion à la base de données
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        
+        return {
+            "status": "healthy",
+            "environment": settings.environment,
+            "database": "connected",
+            "timestamp": datetime.now().isoformat()
+        }
+    except Exception as e:
+        logger.error(f"❌ Health check échoué: {e}")
+        return JSONResponse(
+            status_code=503,
+            content={
+                "status": "unhealthy",
+                "environment": settings.environment,
+                "database": "disconnected",
+                "error": str(e),
+                "timestamp": datetime.now().isoformat()
+            }
+        )
 
 
 # Inclure le router API v1
@@ -65,5 +172,5 @@ if __name__ == "__main__":
         "app.main:app", 
         host=settings.host, 
         port=settings.port, 
-        reload=True
+        reload=settings.is_development  # Reload seulement en développement
     )

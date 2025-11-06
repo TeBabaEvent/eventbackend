@@ -264,16 +264,65 @@ lsof -i :8000
 
 Plus besoin de gérer manuellement les migrations !
 
-## 🚀 Déploiement
+## 🚀 Déploiement sur Railway
 
-Pour déployer en production :
+Ce projet est prêt pour être déployé sur Railway ! 🎉
 
-1. Changez `SECRET_KEY` dans `.env` (générez avec `openssl rand -hex 32`)
-2. Configurez les credentials de la base de données
-3. Ajustez `CORS_ORIGINS` avec les URLs de votre frontend
-4. Utilisez un serveur WSGI comme Gunicorn ou Uvicorn en mode production
+### 🎯 Déploiement Rapide
+
+1. **Push votre code** sur GitHub/GitLab/Bitbucket
+2. **Créez un nouveau projet** sur [Railway](https://railway.app/)
+3. **Connectez votre repository**
+4. **Configurez les variables d'environnement** (voir ci-dessous)
+5. **Déployez automatiquement** ! ✨
+
+### 📝 Variables d'Environnement Requises
+
+```env
+ENVIRONMENT=production
+SECRET_KEY=<générez-avec-openssl-rand-hex-32>
+DATABASE_URL=${{MySQL.DATABASE_URL}}
+CORS_ORIGINS=https://votre-frontend.com
+DEBUG=false
+```
+
+### 📚 Guide Complet
+
+Pour des instructions détaillées de déploiement, consultez **[DEPLOYMENT.md](./DEPLOYMENT.md)**
+
+### ✅ Fonctionnalités Production-Ready
+
+- ✅ **Health Checks** automatiques sur `/health`
+- ✅ **Logging** structuré avec rotation
+- ✅ **CORS** configuré et sécurisé
+- ✅ **Validation** de la SECRET_KEY en production
+- ✅ **Migrations** automatiques au démarrage
+- ✅ **Error Handling** global
+- ✅ **Docs API** désactivées en production
+- ✅ **Connection Pooling** optimisé
+- ✅ **Multi-workers** support
+
+### 🔒 Sécurité
+
+- Secret key validation
+- CORS restrictif
+- Passwords hashés avec bcrypt
+- JWT tokens sécurisés
+- Variables d'environnement protégées
+
+### 📊 Monitoring
+
+Railway fournit :
+- Logs en temps réel
+- Métriques de performance
+- Alertes automatiques
+- Health check monitoring
+
+---
+
+Pour déployer sur **d'autres plateformes** (Heroku, DigitalOcean, etc.) :
 
 ```bash
 # Production avec Uvicorn
-uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4
+uvicorn app.main:app --host 0.0.0.0 --port $PORT --workers 2
 ```
