@@ -28,20 +28,29 @@ async def lifespan(app: FastAPI):
     logger.info(f"🚀 Démarrage de l'API Tebaba en mode {settings.environment}")
     logger.info(f"🌐 CORS Origins: {settings.cors_origins}")
     
-    try:
-        # Migration automatique (vérification et synchronisation du schéma)
-        from app.db.migrations import auto_migrate
-        auto_migrate()
-        logger.info("✅ Base de données initialisée avec succès")
-    except Exception as e:
-        logger.error(f"❌ Erreur lors de l'initialisation de la base de données: {e}")
-        raise
+    # Migration automatique (optionnelle, ne bloque pas le démarrage)
+    if settings.auto_migrate_on_startup:
+        try:
+            from app.db.migrations import auto_migrate
+            logger.info("🔄 Application des migrations...")
+            auto_migrate()
+            logger.info("✅ Base de données initialisée avec succès")
+        except Exception as e:
+            logger.warning(f"⚠️ Impossible d'appliquer les migrations: {e}")
+            logger.warning("⚠️ L'application démarre quand même. Vérifiez votre connexion DB.")
+            logger.info("💡 Appliquez les migrations manuellement avec: python migrate.py")
+    else:
+        logger.info("⏭️ Migrations automatiques désactivées (AUTO_MIGRATE_ON_STARTUP=false)")
+        logger.info("💡 Pour appliquer les migrations: python migrate.py")
     
     yield
     
     # Shutdown
     logger.info("🛑 Arrêt de l'API Tebaba")
-    engine.dispose()
+    try:
+        engine.dispose()
+    except Exception as e:
+        logger.warning(f"⚠️ Erreur lors de la fermeture de la connexion DB: {e}")
 
 
 # Création de l'application FastAPI

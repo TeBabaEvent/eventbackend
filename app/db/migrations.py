@@ -199,3 +199,23 @@ def sync_schema():
     
     print("\n✅ Synchronisation terminée\n")
 
+
+if __name__ == "__main__":
+    """Permet d'exécuter les migrations avec: python -m app.db.migrations"""
+    import sys
+    
+    print("\n📋 Options disponibles:")
+    print("  1. Migration complète (avec suppressions)")
+    print("  2. Synchronisation simple (sans suppressions - recommandé)")
+    
+    choice = input("\n👉 Votre choix (1 ou 2, défaut=2): ").strip() or "2"
+    
+    try:
+        if choice == "1":
+            auto_migrate()
+        else:
+            sync_schema()
+        sys.exit(0)
+    except Exception as e:
+        print(f"\n❌ Erreur: {e}\n")
+        sys.exit(1)

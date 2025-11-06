@@ -32,6 +32,9 @@ class Settings(BaseSettings):
     # Debug mode
     debug: bool = False
     
+    # Migrations automatiques au démarrage (désactivé par défaut en production)
+    auto_migrate_on_startup: bool = True
+    
     model_config = ConfigDict(
         env_file=".env",
         extra='ignore',  # Ignore les champs supplémentaires dans .env
