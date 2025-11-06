@@ -2,6 +2,8 @@
 
 Backend FastAPI pour l'application Tebaba avec authentification JWT et gestion d'événements.
 
+yes
+
 ## 📁 Structure du projet
 
 ```
