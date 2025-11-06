@@ -4,11 +4,11 @@ from typing import Optional, Literal
 import os
 
 class Settings(BaseSettings):
-    # Environment
-    environment: Literal["development", "production", "staging"] = "development"
+    # Environment - PRODUCTION PAR DÉFAUT
+    environment: Literal["development", "production", "staging"] = "production"
     
     # JWT Configuration
-    secret_key: str = "your-secret-key-here-change-this-in-production"
+    secret_key: str
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 30
     
@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     mysql_port: int = 3306
     mysql_user: str = "root"
     mysql_password: str = ""
-    mysql_database: str = "babaevent"
+    mysql_database: str = "railway"
     
     # Optionnel: URL complète de la base de données (prioritaire si fournie)
     database_url: Optional[str] = None
@@ -26,8 +26,8 @@ class Settings(BaseSettings):
     host: str = "0.0.0.0"
     port: int = 8000
     
-    # CORS
-    cors_origins: str = "http://localhost:5173,http://localhost:3000"
+    # CORS - DOIT ÊTRE DÉFINI EN PRODUCTION
+    cors_origins: str
     
     # Debug mode
     debug: bool = False
@@ -46,14 +46,13 @@ class Settings(BaseSettings):
     
     @field_validator('secret_key')
     @classmethod
-    def validate_secret_key(cls, v: str, info) -> str:
-        """Valider que la clé secrète n'est pas la valeur par défaut en production"""
-        if info.data.get('environment') == 'production':
-            if v == "your-secret-key-here-change-this-in-production":
-                raise ValueError(
-                    "⚠️  ERREUR DE SÉCURITÉ: Vous devez changer SECRET_KEY en production! "
-                    "Générez une clé sécurisée avec: openssl rand -hex 32"
-                )
+    def validate_secret_key(cls, v: str) -> str:
+        """Valider que la clé secrète est définie"""
+        if not v or len(v) < 32:
+            raise ValueError(
+                "⚠️  ERREUR DE SÉCURITÉ: SECRET_KEY doit faire au moins 32 caractères! "
+                "Générez une clé sécurisée avec: openssl rand -hex 32"
+            )
         return v
     
     @field_validator('cors_origins')
@@ -61,7 +60,14 @@ class Settings(BaseSettings):
     def validate_cors_origins(cls, v: str) -> str:
         """Valider les origines CORS"""
         if not v:
-            return "*"
+            raise ValueError(
+                "⚠️  ERREUR DE SÉCURITÉ: CORS_ORIGINS doit être défini en production! "
+                "Ne laissez jamais CORS ouvert à tous (*) en production."
+            )
+        # Avertir si localhost est utilisé en production
+        if "localhost" in v.lower():
+            import logging
+            logging.warning("⚠️ ATTENTION: CORS contient 'localhost' - êtes-vous en production?")
         return v
     
     def get_database_url(self) -> str:

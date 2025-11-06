@@ -10,9 +10,11 @@ engine = create_engine(
     settings.get_database_url(),
     pool_pre_ping=True,  # Vérifie la connexion avant de l'utiliser
     pool_recycle=3600,   # Recycle les connexions toutes les heures
-    echo=False,          # Mettre à True pour voir les requêtes SQL en développement
+    echo=False,          # Toujours False en production
+    pool_size=5,         # Taille du pool de connexions
+    max_overflow=10,     # Connexions supplémentaires si nécessaire
     connect_args={
-        "connect_timeout": 30,  # Timeout de 30 secondes
+        "connect_timeout": 30,
         "read_timeout": 30,
         "write_timeout": 30
     }
