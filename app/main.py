@@ -28,19 +28,26 @@ async def lifespan(app: FastAPI):
     logger.info(f"🚀 Démarrage de l'API Tebaba en mode {settings.environment}")
     logger.info(f"🌐 CORS Origins: {settings.cors_origins}")
     
-    # Migration automatique (optionnelle, ne bloque pas le démarrage)
+    # Debug: Afficher l'URL de DB (masquée partiellement)
+    db_url = settings.get_database_url()
+    if "localhost" in db_url:
+        logger.warning("⚠️ ATTENTION: L'app se connecte à LOCALHOST!")
+        logger.warning("⚠️ Vérifiez que DATABASE_URL est bien configurée dans Railway")
+    else:
+        logger.info(f"📊 Connexion DB configurée (host: {settings.mysql_host if not settings.database_url else 'depuis DATABASE_URL'})")
+    
+    # Migrations désactivées par défaut - utilisez python migrate.py pour les appliquer
     if settings.auto_migrate_on_startup:
+        logger.info("🔄 Migrations automatiques activées")
         try:
             from app.db.migrations import auto_migrate
-            logger.info("🔄 Application des migrations...")
             auto_migrate()
             logger.info("✅ Base de données initialisée avec succès")
         except Exception as e:
-            logger.warning(f"⚠️ Impossible d'appliquer les migrations: {e}")
-            logger.warning("⚠️ L'application démarre quand même. Vérifiez votre connexion DB.")
-            logger.info("💡 Appliquez les migrations manuellement avec: python migrate.py")
+            logger.warning(f"⚠️ Erreur lors des migrations: {e}")
+            logger.warning("⚠️ L'application démarre quand même")
     else:
-        logger.info("⏭️ Migrations automatiques désactivées (AUTO_MIGRATE_ON_STARTUP=false)")
+        logger.info("⏭️ Migrations automatiques désactivées")
         logger.info("💡 Pour appliquer les migrations: python migrate.py")
     
     yield

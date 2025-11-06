@@ -32,13 +32,16 @@ class Settings(BaseSettings):
     # Debug mode
     debug: bool = False
     
-    # Migrations automatiques au démarrage (désactivé par défaut en production)
-    auto_migrate_on_startup: bool = True
+    # Migrations automatiques au démarrage (désactivées par défaut)
+    auto_migrate_on_startup: bool = False
     
     model_config = ConfigDict(
         env_file=".env",
+        env_file_encoding='utf-8',
         extra='ignore',  # Ignore les champs supplémentaires dans .env
-        case_sensitive=False
+        case_sensitive=False,
+        # IMPORTANT : Charger depuis les variables d'environnement système en priorité
+        env_nested_delimiter='__'
     )
     
     @field_validator('secret_key')
