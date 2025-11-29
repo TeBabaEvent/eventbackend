@@ -1,7 +1,7 @@
 """Routes pour les événements"""
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.db.database import get_db
 from app.db import models
@@ -17,8 +17,11 @@ async def get_featured_events(
     limit: int = 3,
     db: Session = Depends(get_db)
 ):
-    """Récupérer les événements à la une"""
-    events = db.query(models.Event).filter(
+    """Récupérer les événements à la une - Optimisé avec eager loading"""
+    events = db.query(models.Event).options(
+        joinedload(models.Event.artist_associations).joinedload(models.EventArtist.artist),
+        joinedload(models.Event.pack_associations).joinedload(models.EventPack.pack)
+    ).filter(
         models.Event.featured == True,
         models.Event.status == "upcoming"
     ).limit(limit).all()
@@ -34,8 +37,11 @@ async def get_events(
     status: str = None,
     db: Session = Depends(get_db)
 ):
-    """Récupérer la liste des événements avec filtres optionnels"""
-    query = db.query(models.Event)
+    """Récupérer la liste des événements avec filtres optionnels - Optimisé"""
+    query = db.query(models.Event).options(
+        joinedload(models.Event.artist_associations).joinedload(models.EventArtist.artist),
+        joinedload(models.Event.pack_associations).joinedload(models.EventPack.pack)
+    )
     
     if category:
         query = query.filter(models.Event.category == category)
@@ -50,8 +56,12 @@ async def get_events(
 
 @router.get("/{event_id}")
 async def get_event(event_id: str, db: Session = Depends(get_db)):
-    """Récupérer un événement par son ID"""
-    event = db.query(models.Event).filter(models.Event.id == event_id).first()
+    """Récupérer un événement par son ID - Optimisé avec eager loading"""
+    event = db.query(models.Event).options(
+        joinedload(models.Event.artist_associations).joinedload(models.EventArtist.artist),
+        joinedload(models.Event.pack_associations).joinedload(models.EventPack.pack)
+    ).filter(models.Event.id == event_id).first()
+    
     if not event:
         raise HTTPException(status_code=404, detail="Événement non trouvé")
     return serialize_event(event)
