@@ -17,10 +17,27 @@ from jinja2 import Environment, FileSystemLoader
 _weasyprint_html = None
 _weasyprint_available = None
 
+def _configure_library_paths():
+    """Configure les chemins des bibliothèques pour Nix/Railway."""
+    nix_lib_paths = [
+        "/root/.nix-profile/lib",
+        "/nix/var/nix/profiles/default/lib",
+    ]
+    
+    current_ld_path = os.environ.get("LD_LIBRARY_PATH", "")
+    new_paths = [p for p in nix_lib_paths if p not in current_ld_path and os.path.exists(p)]
+    
+    if new_paths:
+        os.environ["LD_LIBRARY_PATH"] = ":".join(new_paths) + ":" + current_ld_path
+        logging.getLogger(__name__).info(f"LD_LIBRARY_PATH configuré: {os.environ['LD_LIBRARY_PATH'][:100]}...")
+
 def _get_weasyprint():
     """Import WeasyPrint lazily pour éviter le crash au démarrage."""
     global _weasyprint_html, _weasyprint_available
     if _weasyprint_available is None:
+        # Configurer les chemins avant l'import
+        _configure_library_paths()
+        
         try:
             from weasyprint import HTML
             _weasyprint_html = HTML

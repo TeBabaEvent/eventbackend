@@ -47,4 +47,4 @@ PKG_CONFIG_PATH = "/nix/var/nix/profiles/default/lib/pkgconfig:/root/.nix-profil
 GIO_MODULE_DIR = "/nix/var/nix/profiles/default/lib/gio/modules:/root/.nix-profile/lib/gio/modules"
 
 [start]
-cmd = "chmod +x start.sh && ./start.sh"
+cmd = "bash start.sh"
