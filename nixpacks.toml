@@ -6,20 +6,24 @@
 [phases.setup]
 nixPkgs = [
     "python311Full",
-    # WeasyPrint core dependencies
-    "pango",
-    "cairo", 
-    "gdk-pixbuf",
+    # WeasyPrint core dependencies (order matters!)
     "glib",
     "gobject-introspection",
+    "cairo",
+    "pango",
+    "gdk-pixbuf",
     "libffi",
     "fontconfig",
     "freetype",
     "harfbuzz",
     "fribidi",
-    # Additional libs for WeasyPrint
+    # Additional required libs
+    "shared-mime-info",
     "pkg-config",
     "zlib",
+    "pixman",
+    "libpng",
+    "libjpeg",
     # Fonts for PDF rendering
     "liberation_ttf",
     "dejavu_fonts"
@@ -33,9 +37,14 @@ cmds = [
 ]
 
 [variables]
-LD_LIBRARY_PATH = "/nix/var/nix/profiles/default/lib:/root/.nix-profile/lib"
+# Library paths for WeasyPrint dependencies
+LD_LIBRARY_PATH = "/nix/var/nix/profiles/default/lib:/root/.nix-profile/lib:$LD_LIBRARY_PATH"
+LIBRARY_PATH = "/nix/var/nix/profiles/default/lib:/root/.nix-profile/lib"
 GI_TYPELIB_PATH = "/nix/var/nix/profiles/default/lib/girepository-1.0:/root/.nix-profile/lib/girepository-1.0"
 FONTCONFIG_PATH = "/nix/var/nix/profiles/default/etc/fonts"
+PKG_CONFIG_PATH = "/nix/var/nix/profiles/default/lib/pkgconfig:/root/.nix-profile/lib/pkgconfig"
+# Ensure GLib/GObject can be found
+GIO_MODULE_DIR = "/nix/var/nix/profiles/default/lib/gio/modules:/root/.nix-profile/lib/gio/modules"
 
 [start]
 cmd = "chmod +x start.sh && ./start.sh"
