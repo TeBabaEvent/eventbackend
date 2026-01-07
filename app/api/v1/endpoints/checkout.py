@@ -172,7 +172,7 @@ def create_checkout_session(
             order.paid_at = datetime.utcnow()
 
             # Mettre à jour le compteur de ventes
-            event_pack.sold_count = (event_pack.sold_count or 0) + request.quantity
+            event_pack.sold_count = (event_pack.sold_count or 0) + checkout_request.quantity
 
             db.commit()
             db.refresh(order)
@@ -220,13 +220,13 @@ def create_checkout_session(
 
         payment = mollie.create_payment(
             amount=amount_eur,
-            description=f"Billets {event.title} x{request.quantity}",
+            description=f"Billets {event.title} x{checkout_request.quantity}",
             redirect_url=f"{app_settings.frontend_url}/payment/complete?order={order.order_number}",
             webhook_url=f"{app_settings.base_url}/api/webhooks/mollie",
             metadata={
                 "order_number": order.order_number,
                 "event_id": str(event.id),
-                "customer_email": request.customer_email
+                "customer_email": checkout_request.customer_email
             },
             method="bancontact",  # Forcer Bancontact (ou None pour choix libre)
             locale="fr_BE"  # Français Belgique
@@ -467,7 +467,7 @@ def create_cart_checkout_session(
             metadata={
                 "order_number": order.order_number,
                 "event_id": str(event_id),
-                "customer_email": request.customer_email,
+                "customer_email": cart_request.customer_email,
                 "is_cart": "true",
                 "total_packs": str(len(validated_items))
             },
