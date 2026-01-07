@@ -46,22 +46,9 @@ class Settings(BaseSettings):
     # JWT Secret Key pour QR codes (séparée de SECRET_KEY)
     jwt_secret_key: Optional[str] = None
 
-    # URLs pour paiement (OBLIGATOIRES en production)
+    # URLs pour paiement
     base_url: str = "https://eventbackend-production-039e.up.railway.app"
     frontend_url: str = "https://www.baba.events"
-
-    @field_validator('frontend_url', 'base_url')
-    @classmethod
-    def validate_urls_not_localhost_in_production(cls, v: str, info) -> str:
-        """Empêcher localhost en production"""
-        import os
-        env = os.getenv('ENVIRONMENT', 'development')
-        if env == 'production' and 'localhost' in v.lower():
-            raise ValueError(
-                f"⚠️  ERREUR: {info.field_name.upper()} ne peut pas contenir 'localhost' en production! "
-                f"Définissez {info.field_name.upper()} avec votre URL de production."
-            )
-        return v
 
     # Gmail SMTP
     gmail_address: Optional[str] = None
