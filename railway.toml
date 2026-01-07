@@ -1,5 +1,6 @@
 [build]
 builder = "nixpacks"
+# nixpacks.toml contient les dépendances système pour WeasyPrint
 
 [deploy]
 startCommand = "uvicorn app.main:app --host 0.0.0.0 --port $PORT --workers 2"

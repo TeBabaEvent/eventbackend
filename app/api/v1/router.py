@@ -1,7 +1,7 @@
 """Router principal API v1"""
 from fastapi import APIRouter
 
-from app.api.v1.endpoints import auth, artists, packs, events
+from app.api.v1.endpoints import auth, artists, packs, events, checkout, webhooks, scan, admin
 
 api_router = APIRouter()
 
@@ -12,4 +12,14 @@ api_router.include_router(auth.router, prefix="/auth", tags=["Authentification"]
 api_router.include_router(artists.router, prefix="/artists", tags=["Artistes"])
 api_router.include_router(packs.router, prefix="/packs", tags=["Packs"])
 api_router.include_router(events.router, prefix="/events", tags=["Événements"])
+
+# Routes de billetterie
+api_router.include_router(checkout.router, prefix="/checkout", tags=["Paiement"])
+api_router.include_router(webhooks.router, prefix="/webhooks", tags=["Webhooks"])
+
+# Routes de scan/validation
+api_router.include_router(scan.router, prefix="/scan", tags=["Scan"])
+
+# Routes d'administration
+api_router.include_router(admin.router, prefix="/admin", tags=["Administration"])
 

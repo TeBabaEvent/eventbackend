@@ -31,10 +31,15 @@ def get_db():
     """
     Générateur de session de base de données
     À utiliser avec FastAPI Depends()
+    
+    Gère automatiquement le rollback en cas d'exception.
     """
     db = SessionLocal()
     try:
         yield db
+    except Exception:
+        db.rollback()
+        raise
     finally:
         db.close()
 

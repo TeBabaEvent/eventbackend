@@ -5,12 +5,17 @@ import os
 
 class Settings(BaseSettings):
     # Environment - PRODUCTION PAR DÉFAUT
-    environment: Literal["development", "production", "staging"] = "production"
+    environment: Literal["development", "production", "staging"] = "development"
     
     # JWT Configuration
     secret_key: str
     algorithm: str = "HS256"
-    access_token_expire_minutes: int = 30
+    access_token_expire_minutes: int = 15  # ✅ Short-lived for security
+    refresh_token_expire_days: int = 7  # ✅ Refresh token lifetime
+
+    # Cookie Configuration
+    cookie_secure: bool = False  # ✅ Set to True in production (HTTPS only)
+    cookie_samesite: str = "lax"  # ✅ CSRF protection
     
     # MySQL Database Configuration
     mysql_host: str = "localhost"
@@ -34,7 +39,22 @@ class Settings(BaseSettings):
     
     # Migrations automatiques au démarrage (désactivées par défaut)
     auto_migrate_on_startup: bool = False
-    
+
+    # Mollie Payment Provider
+    mollie_api_key: Optional[str] = None
+
+    # JWT Secret Key pour QR codes (séparée de SECRET_KEY)
+    jwt_secret_key: Optional[str] = None
+
+    # URLs pour paiement
+    base_url: str = "http://localhost:8000"
+    frontend_url: str = "http://localhost:5173"
+
+    # Gmail SMTP
+    gmail_address: Optional[str] = None
+    gmail_app_password: Optional[str] = None
+    email_from_name: str = "BABA Event"
+
     model_config = ConfigDict(
         env_file=".env",
         env_file_encoding='utf-8',
@@ -69,7 +89,18 @@ class Settings(BaseSettings):
             import logging
             logging.warning("⚠️ ATTENTION: CORS contient 'localhost' - êtes-vous en production?")
         return v
-    
+
+    @field_validator('jwt_secret_key')
+    @classmethod
+    def validate_jwt_secret_key(cls, v: Optional[str]) -> Optional[str]:
+        """Valider la clé JWT pour les QR codes"""
+        if v and len(v) < 32:
+            raise ValueError(
+                "⚠️  ERREUR DE SÉCURITÉ: JWT_SECRET_KEY doit faire au moins 32 caractères! "
+                "Générez une clé sécurisée avec: openssl rand -hex 32"
+            )
+        return v
+
     def get_database_url(self) -> str:
         """Construire l'URL de la base de données"""
         # Priorité à DATABASE_URL si fournie (typique pour Railway, Heroku, etc.)

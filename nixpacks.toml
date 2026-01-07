@@ -1,0 +1,26 @@
+# ============================================
+# Nixpacks Configuration for Railway
+# WeasyPrint System Dependencies
+# ============================================
+
+[phases.setup]
+nixPkgs = [
+    "python311",
+    # WeasyPrint dependencies
+    "pango",
+    "cairo", 
+    "gdk-pixbuf",
+    "libffi",
+    "fontconfig",
+    "freetype",
+    # Fonts for PDF rendering
+    "liberation_ttf",
+    "dejavu_fonts"
+]
+
+[phases.install]
+cmds = ["pip install --upgrade pip", "pip install -r requirements.txt"]
+
+[start]
+cmd = "uvicorn app.main:app --host 0.0.0.0 --port $PORT --workers 2"
+

@@ -1,15 +1,57 @@
-fastapi==0.104.1
-uvicorn[standard]==0.24.0
-python-jose[cryptography]==3.3.0
-passlib[bcrypt]==1.7.4
-bcrypt==4.1.3
-python-multipart==0.0.6
-python-dotenv==1.0.0
-pydantic-settings==2.0.3
-requests==2.31.0
-sqlalchemy==2.0.36
-pymysql==1.1.0
-cryptography==41.0.7
+# ============================================
+# Framework
+# ============================================
+fastapi==0.124.0
+uvicorn[standard]==0.38.0
 
-# Production dependencies
+# ============================================
+# Auth & Security
+# ============================================
+python-jose[cryptography]==3.3.0
+bcrypt==4.2.1
+cryptography==46.0.3
+slowapi==0.1.9
+
+# ============================================
+# Utilities
+# ============================================
+python-multipart==0.0.20
+python-dotenv==1.0.1
+pydantic-settings==2.12.0
+email-validator==2.2.0
+requests==2.32.3
+
+# ============================================
+# Database
+# ============================================
+sqlalchemy==2.0.44
+pymysql==1.1.2
+
+# ============================================
+# Production
+# ============================================
 gunicorn==21.2.0
+
+# ============================================
+# BILLETTERIE - New Dependencies
+# ============================================
+
+# Mollie Payments (remplace CCV)
+mollie-api-python>=3.0.0
+
+# HTTP Client (utilisé par Mollie SDK et autres services)
+httpx==0.28.1
+
+# QR Codes & PDF Generation
+segno==1.6.6
+PyJWT==2.10.1
+weasyprint>=67.0
+Pillow>=10.0.0
+
+# Email Templates
+Jinja2==3.1.6
+
+# ============================================
+# Scheduled Jobs (CRON)
+# ============================================
+apscheduler==3.10.4

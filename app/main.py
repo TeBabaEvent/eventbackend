@@ -5,9 +5,14 @@ from datetime import datetime
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+# from fastapi.middleware.gzip import GZipMiddleware  # Disabled due to Python 3.14 bug
 from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi.exceptions import RequestValidationError
 from sqlalchemy import text
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+
+from app.core.rate_limiter import limiter
 
 from app.core.config import settings
 from app.api.v1.router import api_router
@@ -19,6 +24,8 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+# Rate limiter imported from app.core.rate_limiter
 
 
 @asynccontextmanager
@@ -40,8 +47,9 @@ async def lifespan(app: FastAPI):
     if settings.auto_migrate_on_startup:
         logger.info("🔄 Migrations automatiques activées")
         try:
-            from app.db.migrations import auto_migrate
+            from app.db.migrations import auto_migrate, fix_column_constraints
             auto_migrate()
+            fix_column_constraints()  # Corrige les contraintes de colonnes (nullable, etc.)
             logger.info("✅ Base de données initialisée avec succès")
         except Exception as e:
             logger.warning(f"⚠️ Erreur lors des migrations: {e}")
@@ -50,10 +58,26 @@ async def lifespan(app: FastAPI):
         logger.info("⏭️ Migrations automatiques désactivées")
         logger.info("💡 Pour appliquer les migrations: python migrate.py")
     
+    # Démarrer le scheduler de tâches planifiées (CRON jobs)
+    try:
+        from app.services.scheduler import start_scheduler
+        start_scheduler()
+    except Exception as e:
+        logger.warning(f"⚠️ Erreur démarrage scheduler: {e}")
+        logger.warning("⚠️ Les jobs CRON ne seront pas exécutés")
+    
     yield
     
     # Shutdown
     logger.info("🛑 Arrêt de l'API Tebaba")
+    
+    # Arrêter le scheduler
+    try:
+        from app.services.scheduler import stop_scheduler
+        stop_scheduler()
+    except Exception as e:
+        logger.warning(f"⚠️ Erreur arrêt scheduler: {e}")
+    
     try:
         engine.dispose()
     except Exception as e:
@@ -70,6 +94,10 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+# Attacher le limiter à l'app
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
 
 # Configuration CORS
 origins = [origin.strip() for origin in settings.cors_origins.split(",") if origin.strip()]
@@ -81,25 +109,55 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Middleware de compression Gzip (Minimum 1000 bytes pour compresser)
+# ⚠️ Disabled: Python 3.14 GZip bug causes log pollution
+# In production, use a reverse proxy (Caddy/Nginx) for compression instead
+# app.add_middleware(GZipMiddleware, minimum_size=1000)
+
+
+# ✅ Security Headers Middleware
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    """Add security headers to all responses"""
+    response = await call_next(request)
+
+    # Prevent MIME sniffing
+    response.headers["X-Content-Type-Options"] = "nosniff"
+
+    # Prevent clickjacking
+    response.headers["X-Frame-Options"] = "DENY"
+
+    # Enable browser XSS protection
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+
+    # Referrer policy
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+
+    # HTTPS enforcement (HSTS) - only in production
+    if settings.is_production:
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+
+    return response
+
 
 # Middleware pour logger les requêtes
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
     """Logger toutes les requêtes HTTP"""
     start_time = datetime.now()
-    
+
     # Log de la requête entrante
     logger.info(f"➡️  {request.method} {request.url.path}")
-    
+
     response = await call_next(request)
-    
+
     # Log de la réponse
     process_time = (datetime.now() - start_time).total_seconds()
     logger.info(
         f"⬅️  {request.method} {request.url.path} "
         f"- Status: {response.status_code} - Time: {process_time:.3f}s"
     )
-    
+
     return response
 
 

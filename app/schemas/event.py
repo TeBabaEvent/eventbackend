@@ -20,8 +20,9 @@ class EventBase(BaseModel):
     city: str
     maps_embed_url: Optional[str] = None
     image_url: Optional[str] = None
+    youtube_shorts_url: Optional[str] = None
+    instagram_reels_url: Optional[str] = None
     capacity: Optional[int] = None
-    featured: bool = False
     status: str = "upcoming"
 
 
@@ -43,8 +44,9 @@ class EventUpdate(BaseModel):
     city: Optional[str] = None
     maps_embed_url: Optional[str] = None
     image_url: Optional[str] = None
+    youtube_shorts_url: Optional[str] = None
+    instagram_reels_url: Optional[str] = None
     capacity: Optional[int] = None
-    featured: Optional[bool] = None
     status: Optional[str] = None
     artists: Optional[List[EventArtistInfo]] = None
     packs: Optional[List[EventPackInfo]] = None
@@ -73,7 +75,6 @@ class EventList(BaseModel):
     location: str
     city: str
     image_url: Optional[str] = None
-    featured: bool
     status: str
     
     class Config:
