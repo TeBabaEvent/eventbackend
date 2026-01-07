@@ -217,12 +217,16 @@ def create_checkout_session(
     try:
         # Note: Mollie Bancontact n'a pas de limite QR de 1500€ comme CCV
         # Le paiement fonctionnera pour tous les montants
+        
+        # Debug: log webhook URL
+        webhook_url = f"{app_settings.base_url}/api/webhooks/mollie"
+        logger.info(f"🔗 Webhook URL pour Mollie: {webhook_url}")
 
         payment = mollie.create_payment(
             amount=amount_eur,
             description=f"Billets {event.title} x{checkout_request.quantity}",
             redirect_url=f"{app_settings.frontend_url}/payment/complete?order={order.order_number}",
-            webhook_url=f"{app_settings.base_url}/api/webhooks/mollie",
+            webhook_url=webhook_url,
             metadata={
                 "order_number": order.order_number,
                 "event_id": str(event.id),
@@ -458,12 +462,16 @@ def create_cart_checkout_session(
         event = db.query(models.Event).filter(models.Event.id == event_id).first()
         pack_names = [item_data["pack"].name for item_data in validated_items]
         description = f"Billets {event.title} - {', '.join(pack_names)}"
+        
+        # Debug: log webhook URL
+        webhook_url = f"{app_settings.base_url}/api/webhooks/mollie"
+        logger.info(f"🔗 Webhook URL pour Mollie: {webhook_url}")
 
         payment = mollie.create_payment(
             amount=total_amount_eur,
             description=description,
             redirect_url=f"{app_settings.frontend_url}/payment/complete?order={order.order_number}",
-            webhook_url=f"{app_settings.base_url}/api/webhooks/mollie",
+            webhook_url=webhook_url,
             metadata={
                 "order_number": order.order_number,
                 "event_id": str(event_id),
