@@ -6,7 +6,7 @@
 [phases.setup]
 nixPkgs = [
     "python311Full",
-    # WeasyPrint dependencies
+    # WeasyPrint core dependencies
     "pango",
     "cairo", 
     "gdk-pixbuf",
@@ -17,6 +17,9 @@ nixPkgs = [
     "freetype",
     "harfbuzz",
     "fribidi",
+    # Additional libs for WeasyPrint
+    "pkg-config",
+    "zlib",
     # Fonts for PDF rendering
     "liberation_ttf",
     "dejavu_fonts"
@@ -30,8 +33,9 @@ cmds = [
 ]
 
 [variables]
-LD_LIBRARY_PATH = "/root/.nix-profile/lib"
-GI_TYPELIB_PATH = "/root/.nix-profile/lib/girepository-1.0"
+LD_LIBRARY_PATH = "/nix/var/nix/profiles/default/lib:/root/.nix-profile/lib"
+GI_TYPELIB_PATH = "/nix/var/nix/profiles/default/lib/girepository-1.0:/root/.nix-profile/lib/girepository-1.0"
+FONTCONFIG_PATH = "/nix/var/nix/profiles/default/etc/fonts"
 
 [start]
-cmd = "/opt/venv/bin/uvicorn app.main:app --host 0.0.0.0 --port $PORT --workers 2"
+cmd = "export LD_LIBRARY_PATH=/nix/var/nix/profiles/default/lib:$LD_LIBRARY_PATH && /opt/venv/bin/uvicorn app.main:app --host 0.0.0.0 --port $PORT --workers 2"
