@@ -38,4 +38,4 @@ GI_TYPELIB_PATH = "/nix/var/nix/profiles/default/lib/girepository-1.0:/root/.nix
 FONTCONFIG_PATH = "/nix/var/nix/profiles/default/etc/fonts"
 
 [start]
-cmd = "export LD_LIBRARY_PATH=/nix/var/nix/profiles/default/lib:$LD_LIBRARY_PATH && /opt/venv/bin/uvicorn app.main:app --host 0.0.0.0 --port $PORT --workers 2"
+cmd = "chmod +x start.sh && ./start.sh"

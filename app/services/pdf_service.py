@@ -11,8 +11,31 @@ from typing import List
 from concurrent.futures import ThreadPoolExecutor
 import logging
 
-from weasyprint import HTML, CSS
 from jinja2 import Environment, FileSystemLoader
+
+# WeasyPrint lazy import - évite le crash au démarrage si les libs système manquent
+_weasyprint_html = None
+_weasyprint_available = None
+
+def _get_weasyprint():
+    """Import WeasyPrint lazily pour éviter le crash au démarrage."""
+    global _weasyprint_html, _weasyprint_available
+    if _weasyprint_available is None:
+        try:
+            from weasyprint import HTML
+            _weasyprint_html = HTML
+            _weasyprint_available = True
+            logging.getLogger(__name__).info("WeasyPrint chargé avec succès")
+        except (ImportError, OSError) as e:
+            _weasyprint_available = False
+            logging.getLogger(__name__).error(f"WeasyPrint non disponible: {e}")
+    
+    if not _weasyprint_available:
+        raise RuntimeError(
+            "WeasyPrint n'est pas disponible. Les dépendances système (pango, cairo, glib) "
+            "ne sont pas correctement installées. La génération de PDF est désactivée."
+        )
+    return _weasyprint_html
 
 from app.db.models import Ticket, Order
 from app.services.ticket_service import generate_qr_image
@@ -111,6 +134,7 @@ def _get_logo_base64() -> str:
 
 def _render_pdf_sync(html_content: str, filepath: str) -> str:
     """Synchronous PDF rendering (runs in thread pool)."""
+    HTML = _get_weasyprint()
     HTML(string=html_content).write_pdf(filepath)
     return filepath
 
