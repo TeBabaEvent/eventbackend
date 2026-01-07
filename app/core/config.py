@@ -13,9 +13,9 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 15  # ✅ Short-lived for security
     refresh_token_expire_days: int = 7  # ✅ Refresh token lifetime
 
-    # Cookie Configuration
-    cookie_secure: bool = False  # ✅ Set to True in production (HTTPS only)
-    cookie_samesite: str = "lax"  # ✅ CSRF protection
+    # Cookie Configuration - Cross-origin requires SameSite=none + Secure
+    cookie_secure: bool = True  # ✅ Always True for HTTPS (required with SameSite=none)
+    cookie_samesite: str = "none"  # ✅ Required for cross-origin cookies (frontend != backend domain)
     
     # MySQL Database Configuration
     mysql_host: str = "localhost"
