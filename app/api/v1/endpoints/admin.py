@@ -640,32 +640,32 @@ def get_users(
 @router.post("/users", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 @limiter.limit(RATE_LIMITS["user_create"])  # 10 user creations per minute
 def create_user(
-    http_request: Request,  # Required for rate limiting
-    request: UserCreate,
+    request: Request,  # Required for rate limiting (must be named 'request' for slowapi)
+    user_data: UserCreate,
     admin: models.User = Depends(require_admin),
     user_service: AdminUserService = Depends(get_admin_user_service)
 ):
     """Créer un nouvel utilisateur. (Rate limited: 10/min)"""
-    logger.info(f"Admin {admin.username} crée utilisateur {request.username}")
+    logger.info(f"Admin {admin.username} crée utilisateur {user_data.username}")
 
     # Vérifications métier
-    if user_service.get_user_by_email(request.email):
+    if user_service.get_user_by_email(user_data.email):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cet email existe déjà")
     
-    if user_service.get_user_by_username(request.username):
+    if user_service.get_user_by_username(user_data.username):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cet username existe déjà")
 
-    if request.role == "super_admin" and admin.role != "super_admin":
+    if user_data.role == "super_admin" and admin.role != "super_admin":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Seul un super_admin peut créer un autre super_admin")
 
     try:
         new_user = user_service.create_user(
-            username=request.username,
-            email=request.email,
-            password=request.password,
-            name=request.name,
-            role=request.role,
-            phone=request.phone
+            username=user_data.username,
+            email=user_data.email,
+            password=user_data.password,
+            name=user_data.name,
+            role=user_data.role,
+            phone=user_data.phone
         )
         return UserResponse(**user_service.format_user_response(new_user))
     except Exception as e:

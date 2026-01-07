@@ -54,8 +54,8 @@ class CheckoutResponse(BaseModel):
 )
 @limiter.limit(RATE_LIMITS["checkout"])  # 10 checkout attempts per minute
 def create_checkout_session(
-    http_request: Request,  # Required for rate limiting
-    request: CheckoutRequest,
+    request: Request,  # Required for rate limiting (must be named 'request' for slowapi)
+    checkout_request: CheckoutRequest,
     db: Session = Depends(get_db),
     mollie: MolliePaymentClient = Depends(get_mollie_client),  # Injection de dépendance
     app_settings: Settings = Depends(get_settings)  # Injection de dépendance
@@ -85,12 +85,12 @@ def create_checkout_session(
         HTTPException 500: Si erreur Mollie ou DB
     """
     # 1. Valider l'événement
-    event = db.query(models.Event).filter(models.Event.id == request.event_id).first()
+    event = db.query(models.Event).filter(models.Event.id == checkout_request.event_id).first()
     if not event:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Événement non trouvé")
 
     # 2. Valider le pack
-    pack = db.query(models.Pack).filter(models.Pack.id == request.pack_id).first()
+    pack = db.query(models.Pack).filter(models.Pack.id == checkout_request.pack_id).first()
     if not pack:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Pack non trouvé")
 
@@ -99,8 +99,8 @@ def create_checkout_session(
 
     # 3. Vérifier la disponibilité avec verrouillage FOR UPDATE (évite race conditions)
     event_pack = db.query(models.EventPack).filter(
-        models.EventPack.event_id == request.event_id,
-        models.EventPack.pack_id == request.pack_id
+        models.EventPack.event_id == checkout_request.event_id,
+        models.EventPack.pack_id == checkout_request.pack_id
     ).with_for_update().first()
 
     if not event_pack:
@@ -113,7 +113,7 @@ def create_checkout_session(
     # Vérifier capacité automatique
     if event_pack.capacity is not None:
         remaining = event_pack.capacity - event_pack.sold_count
-        if request.quantity > remaining:
+        if checkout_request.quantity > remaining:
             if remaining <= 0:
                 raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Ce pack est complet pour cet événement")
             raise HTTPException(
@@ -122,17 +122,17 @@ def create_checkout_session(
             )
 
     # 4. Valider la quantité
-    if request.quantity <= 0:
+    if checkout_request.quantity <= 0:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="La quantité doit être supérieure à 0")
 
-    if request.quantity > 50:
+    if checkout_request.quantity > 50:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Maximum 50 billets par commande")
 
     # 5. Calculer le montant
-    amount_cents = int(pack.price * request.quantity * 100)  # Stocker en centimes
+    amount_cents = int(pack.price * checkout_request.quantity * 100)  # Stocker en centimes
     amount_eur = amount_cents / 100  # Pour Mollie (EUR décimaux)
 
-    logger.info(f"Création commande: {request.quantity}x {pack.name} pour {event.title}")
+    logger.info(f"Création commande: {checkout_request.quantity}x {pack.name} pour {event.title}")
 
     # 6. Générer un numéro de commande unique
     order_number = generate_order_number()
@@ -145,14 +145,14 @@ def create_checkout_session(
     # 7. Créer la commande en DB (status=pending) avec expiration
     order = models.Order(
         order_number=order_number,
-        event_id=request.event_id,
-        pack_id=request.pack_id,
-        quantity=request.quantity,
+        event_id=checkout_request.event_id,
+        pack_id=checkout_request.pack_id,
+        quantity=checkout_request.quantity,
         amount=amount_cents,
         status="pending",
-        customer_email=request.customer_email,
-        customer_name=request.customer_name,
-        customer_phone=request.customer_phone,
+        customer_email=checkout_request.customer_email,
+        customer_name=checkout_request.customer_name,
+        customer_phone=checkout_request.customer_phone,
         expires_at=datetime.utcnow() + timedelta(minutes=ORDER_PENDING_TIMEOUT_MINUTES)
     )
 
@@ -268,8 +268,8 @@ def create_checkout_session(
 )
 @limiter.limit(RATE_LIMITS["checkout"])  # 10 checkout attempts per minute
 def create_cart_checkout_session(
-    http_request: Request,  # Required for rate limiting
-    request: CartCheckoutRequest,
+    request: Request,  # Required for rate limiting (must be named 'request' for slowapi)
+    cart_request: CartCheckoutRequest,
     db: Session = Depends(get_db),
     mollie: MolliePaymentClient = Depends(get_mollie_client),  # Injection de dépendance
     app_settings: Settings = Depends(get_settings)  # Injection de dépendance
@@ -303,7 +303,7 @@ def create_cart_checkout_session(
     total_amount_cents = 0
     event_id = None  # Tous les packs doivent être pour le même événement
 
-    for item in request.items:
+    for item in cart_request.items:
         # Valider l'événement
         event = db.query(models.Event).filter(models.Event.id == item.event_id).first()
         if not event:
@@ -380,9 +380,9 @@ def create_cart_checkout_session(
         event_id=event_id,
         amount=total_amount_cents,
         status="pending",
-        customer_email=request.customer_email,
-        customer_name=request.customer_name,
-        customer_phone=request.customer_phone,
+        customer_email=cart_request.customer_email,
+        customer_name=cart_request.customer_name,
+        customer_phone=cart_request.customer_phone,
         expires_at=datetime.utcnow() + timedelta(minutes=ORDER_PENDING_TIMEOUT_MINUTES)
     )
 
