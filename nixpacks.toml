@@ -10,9 +10,12 @@ nixPkgs = [
     "pango",
     "cairo", 
     "gdk-pixbuf",
+    "glib",
     "libffi",
     "fontconfig",
     "freetype",
+    "harfbuzz",
+    "fribidi",
     # Fonts for PDF rendering
     "liberation_ttf",
     "dejavu_fonts"
@@ -26,4 +29,4 @@ cmds = [
 ]
 
 [start]
-cmd = "/opt/venv/bin/uvicorn app.main:app --host 0.0.0.0 --port $PORT --workers 2"
+cmd = "LD_LIBRARY_PATH=$HOME/.nix-profile/lib:$LD_LIBRARY_PATH /opt/venv/bin/uvicorn app.main:app --host 0.0.0.0 --port $PORT --workers 2"
