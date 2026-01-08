@@ -236,7 +236,8 @@ class Order(Base):
 
     # Payment Method & Provider
     payment_method = Column(String(20), default="online", nullable=False)  # online, cash
-    mollie_payment_id = Column(String(50), nullable=True, index=True)  # ID paiement Mollie (tr_xxx)
+    paypal_order_id = Column(String(50), nullable=True, index=True)  # ID commande PayPal
+    mollie_payment_id = Column(String(50), nullable=True, index=True)  # Legacy: ID paiement Mollie (tr_xxx)
 
     # Informations client
     customer_email = Column(String(255), nullable=False, index=True)

@@ -40,7 +40,13 @@ class Settings(BaseSettings):
     # Migrations automatiques au démarrage (désactivées par défaut)
     auto_migrate_on_startup: bool = False
 
-    # Mollie Payment Provider
+    # PayPal Payment Provider (remplace Mollie)
+    paypal_client_id: Optional[str] = None
+    paypal_client_secret: Optional[str] = None
+    paypal_mode: str = "sandbox"  # "sandbox" ou "live"
+    paypal_webhook_id: Optional[str] = None
+    
+    # Mollie (Legacy - À SUPPRIMER après migration complète)
     mollie_api_key: Optional[str] = None
 
     # JWT Secret Key pour QR codes (séparée de SECRET_KEY)

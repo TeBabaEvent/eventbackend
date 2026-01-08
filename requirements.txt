@@ -36,8 +36,8 @@ gunicorn==21.2.0
 # BILLETTERIE - New Dependencies
 # ============================================
 
-# Mollie Payments (remplace CCV)
-mollie-api-python>=3.0.0
+# PayPal Payments (remplace Mollie)
+paypal-server-sdk>=0.5.0
 
 # HTTP Client (utilisé par Mollie SDK et autres services)
 httpx==0.28.1

@@ -7,11 +7,186 @@ import httpx
 
 from app.db.database import get_db
 from app.db import models
-from app.services.mollie_client import mollie_client
 from app.services.ticket_service import generate_tickets_for_order
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+
+@router.post("/paypal")
+async def paypal_webhook(
+    request: Request,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db)
+):
+    """
+    Webhook PayPal - Reçoit les notifications de paiement.
+
+    ⚠️ IMPORTANT - Format PayPal:
+    - Content-Type: application/json
+    - Body: JSON avec event_type et resource
+
+    Sécurité:
+    - PayPal signe les webhooks (headers PAYPAL-TRANSMISSION-SIG, etc.)
+    - Vérifier la signature avant traitement
+
+    Events:
+    - PAYMENT.CAPTURE.COMPLETED: Paiement capturé ✅
+    - PAYMENT.CAPTURE.DENIED: Paiement refusé ❌
+    - CHECKOUT.ORDER.APPROVED: Commande approuvée (nécessite capture)
+
+    Returns:
+        dict: {"status": "processed"} ou {"status": "error"}
+    """
+    from app.services.paypal_client import paypal_client
+    
+    # Récupérer le JSON
+    try:
+        body = await request.json()
+    except Exception:
+        logger.warning("Webhook PayPal reçu avec body invalide")
+        return {"status": "invalid_body"}
+    
+    event_type = body.get("event_type")
+    resource = body.get("resource", {})
+    
+    logger.info(f"📨 Webhook PayPal reçu: {event_type}")
+    
+    # Récupérer l'order_number depuis custom_id ou reference_id
+    order_number = None
+    purchase_units = resource.get("purchase_units", [])
+    if purchase_units:
+        order_number = purchase_units[0].get("reference_id") or purchase_units[0].get("custom_id")
+    
+    # Fallback: chercher dans supplementary_data
+    if not order_number:
+        supplementary = resource.get("supplementary_data", {})
+        related = supplementary.get("related_ids", {})
+        order_number = related.get("order_id")
+    
+    if not order_number:
+        logger.warning(f"Webhook PayPal sans order_number identifiable")
+        return {"status": "missing_order_number"}
+    
+    # Trouver la commande
+    order = db.query(models.Order).filter(
+        models.Order.order_number == order_number
+    ).first()
+    
+    if not order:
+        # Fallback par paypal_order_id
+        paypal_order_id = resource.get("id")
+        if paypal_order_id:
+            order = db.query(models.Order).filter(
+                models.Order.paypal_order_id == paypal_order_id
+            ).first()
+    
+    if not order:
+        logger.error(f"❌ Commande non trouvée: {order_number}")
+        return {"status": "order_not_found"}
+    
+    # Idempotence check
+    existing = db.query(models.WebhookEvent).filter(
+        models.WebhookEvent.provider_event_id == body.get("id"),
+        models.WebhookEvent.provider == "paypal"
+    ).first()
+    
+    if existing and existing.status == "processed":
+        logger.info(f"Webhook {body.get('id')} déjà traité, ignoré")
+        return {"status": "already_processed"}
+    
+    # Enregistrer le webhook
+    webhook_event = models.WebhookEvent(
+        provider="paypal",
+        provider_event_id=body.get("id"),
+        event_type=event_type,
+        status="processing",
+        raw_payload=body
+    )
+    db.add(webhook_event)
+    db.commit()
+    
+    try:
+        # Traiter selon le type d'événement
+        if event_type == "CHECKOUT.ORDER.APPROVED":
+            # L'ordre a été approuvé, il faut le capturer
+            logger.info(f"📝 Commande approuvée, capture en cours: {order.order_number}")
+            
+            paypal_order_id = resource.get("id")
+            capture_result = paypal_client.capture_order(paypal_order_id)
+            
+            if capture_result.get("status") == "COMPLETED":
+                # Paiement réussi !
+                order.status = "completed"
+                order.paid_at = datetime.utcnow()
+                
+                # Mettre à jour les compteurs
+                if order.items:
+                    for order_item in order.items:
+                        event_pack = db.query(models.EventPack).filter(
+                            models.EventPack.event_id == order_item.event_id,
+                            models.EventPack.pack_id == order_item.pack_id
+                        ).with_for_update().first()
+                        if event_pack:
+                            event_pack.sold_count = (event_pack.sold_count or 0) + order_item.quantity
+                elif order.pack_id and order.quantity:
+                    event_pack = db.query(models.EventPack).filter(
+                        models.EventPack.event_id == order.event_id,
+                        models.EventPack.pack_id == order.pack_id
+                    ).with_for_update().first()
+                    if event_pack:
+                        event_pack.sold_count = (event_pack.sold_count or 0) + order.quantity
+                
+                db.commit()
+                
+                # Générer tickets en background
+                background_tasks.add_task(process_successful_payment, order.id)
+                
+        elif event_type == "PAYMENT.CAPTURE.COMPLETED":
+            # Capture complétée (peut arriver après CHECKOUT.ORDER.APPROVED)
+            if order.status == "pending":
+                order.status = "completed"
+                order.paid_at = datetime.utcnow()
+                
+                # Mettre à jour les compteurs
+                if order.items:
+                    for order_item in order.items:
+                        event_pack = db.query(models.EventPack).filter(
+                            models.EventPack.event_id == order_item.event_id,
+                            models.EventPack.pack_id == order_item.pack_id
+                        ).with_for_update().first()
+                        if event_pack:
+                            event_pack.sold_count = (event_pack.sold_count or 0) + order_item.quantity
+                elif order.pack_id and order.quantity:
+                    event_pack = db.query(models.EventPack).filter(
+                        models.EventPack.event_id == order.event_id,
+                        models.EventPack.pack_id == order.pack_id
+                    ).with_for_update().first()
+                    if event_pack:
+                        event_pack.sold_count = (event_pack.sold_count or 0) + order.quantity
+                
+                db.commit()
+                background_tasks.add_task(process_successful_payment, order.id)
+                
+        elif event_type in ["PAYMENT.CAPTURE.DENIED", "PAYMENT.CAPTURE.DECLINED"]:
+            # Paiement échoué
+            if order.status == "pending":
+                order.status = "failed"
+                db.commit()
+        
+        # Marquer webhook comme traité
+        webhook_event.status = "processed"
+        webhook_event.processed_at = datetime.utcnow()
+        db.commit()
+        
+        return {"status": "processed"}
+        
+    except Exception as e:
+        webhook_event.status = "failed"
+        webhook_event.error_message = str(e)
+        db.commit()
+        logger.exception(f"❌ Erreur traitement webhook PayPal: {e}")
+        return {"status": "error", "message": str(e)}
 
 
 @router.post("/mollie")
@@ -21,43 +196,20 @@ async def mollie_webhook(
     db: Session = Depends(get_db)
 ):
     """
-    Webhook Mollie - Reçoit les notifications de paiement.
+    Webhook Mollie - LEGACY - Conservé pour les anciennes commandes.
+
+    ⚠️ DEPRECATED: Utiliser PayPal pour les nouvelles commandes.
 
     ⚠️ IMPORTANT - Format Mollie:
     - Content-Type: application/x-www-form-urlencoded
     - Body: id=tr_xxxxxxxx
     - PAS de JSON, PAS de statut dans le payload!
 
-    Sécurité:
-    - Mollie ne signe pas les webhooks
-    - On DOIT toujours vérifier le statut via l'API
-    - Un attaquant pourrait appeler cette URL avec n'importe quel ID
-
-    Statuts Mollie:
-    - open: Paiement créé, client n'a pas encore payé
-    - pending: Paiement en cours de traitement
-    - paid: Paiement réussi ✅
-    - failed: Paiement échoué
-    - canceled: Annulé par le client
-    - expired: Expiré (timeout)
-
-    Flow:
-    1. Extraire l'ID du paiement
-    2. Vérifier l'idempotence (déjà traité?)
-    3. Enregistrer le webhook (status=processing)
-    4. Appeler l'API Mollie pour le VRAI statut
-    5. Trouver la commande
-    6. Traiter selon le statut
-    7. Marquer webhook comme processed
-
-    Retries:
-    - Mollie retry jusqu'à 10 fois si pas de 200 OK
-    - Timeout après 15 secondes
-    - Toujours retourner 200 même en cas d'erreur interne
-
     Returns:
         dict: {"status": "processed"} ou {"status": "already_processed"}
     """
+    from app.services.mollie_client import mollie_client
+    
     # ⚠️ CRITIQUE: Mollie envoie du form-urlencoded, pas du JSON!
     form_data = await request.form()
     mollie_payment_id = form_data.get("id")

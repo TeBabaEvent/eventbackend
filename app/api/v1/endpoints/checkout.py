@@ -10,8 +10,8 @@ import logging
 
 from app.db.database import get_db
 from app.db import models
-from app.services.mollie_client import mollie_client, MolliePaymentClient
-from app.api.deps import get_mollie_client, get_settings
+from app.services.paypal_client import paypal_client, PayPalPaymentClient
+from app.api.deps import get_paypal_client, get_settings
 from app.utils.generators import generate_order_number
 from app.schemas.cart import CartCheckoutRequest, CartCheckoutResponse
 from app.core.config import settings, Settings
@@ -57,19 +57,19 @@ async def create_checkout_session(
     request: Request,  # Required for rate limiting (must be named 'request' for slowapi)
     checkout_request: CheckoutRequest,
     db: Session = Depends(get_db),
-    mollie: MolliePaymentClient = Depends(get_mollie_client),  # Injection de dépendance
+    paypal: PayPalPaymentClient = Depends(get_paypal_client),  # Injection de dépendance
     app_settings: Settings = Depends(get_settings)  # Injection de dépendance
 ):
     """
-    Crée une session de paiement Mollie. (Rate limited: 10/min)
+    Crée une session de paiement PayPal. (Rate limited: 10/min)
 
     Flow:
     1. Valider que l'événement et le pack existent
     2. Vérifier la disponibilité avec verrouillage (évite race conditions)
     3. Calculer le montant total
     4. Créer la commande en DB (status=pending)
-    5. Appeler Mollie pour créer le paiement
-    6. Sauvegarder l'ID du paiement Mollie
+    5. Appeler PayPal pour créer la commande
+    6. Sauvegarder l'ID de la commande PayPal
     7. Retourner l'URL de paiement au frontend
 
     Args:
@@ -82,7 +82,7 @@ async def create_checkout_session(
     Raises:
         HTTPException 404: Si l'événement ou le pack n'existe pas
         HTTPException 400: Si le pack n'est pas actif ou est sold out
-        HTTPException 500: Si erreur Mollie ou DB
+        HTTPException 500: Si erreur PayPal ou DB
     """
     # 1. Valider l'événement
     event = db.query(models.Event).filter(models.Event.id == checkout_request.event_id).first()
@@ -214,44 +214,36 @@ async def create_checkout_session(
             amount=0.0
         )
 
-    # 8. Créer le paiement Mollie (seulement si montant > 0)
+    # 8. Créer la commande PayPal (seulement si montant > 0)
     try:
-        # Note: Mollie Bancontact n'a pas de limite QR de 1500€ comme CCV
-        # Le paiement fonctionnera pour tous les montants
+        # PayPal supporte tous les montants sans limite spécifique
         
-        # Debug: log webhook URL
-        webhook_url = f"{app_settings.base_url}/api/webhooks/mollie"
-        logger.info(f"🔗 Webhook URL pour Mollie: {webhook_url}")
+        logger.info(f"🔗 Création commande PayPal pour {order.order_number}")
 
-        payment = mollie.create_payment(
+        payment = paypal.create_order(
             amount=amount_eur,
             description=f"Billets {event.title} x{checkout_request.quantity}",
-            redirect_url=f"{app_settings.frontend_url}/payment/complete?order={order.order_number}",
-            webhook_url=webhook_url,
-            metadata={
-                "order_number": order.order_number,
-                "event_id": str(event.id),
-                "customer_email": checkout_request.customer_email
-            },
-            method="bancontact",  # Forcer Bancontact (ou None pour choix libre)
-            locale="fr_BE"  # Français Belgique
+            return_url=f"{app_settings.frontend_url}/payment/complete?order={order.order_number}",
+            cancel_url=f"{app_settings.frontend_url}/payment/complete?order={order.order_number}&status=cancelled",
+            reference_id=order.order_number,
+            locale="fr-BE"  # Français Belgique
         )
 
-        # 9. Sauvegarder l'ID du paiement Mollie
-        order.mollie_payment_id = payment["id"]
+        # 9. Sauvegarder l'ID de la commande PayPal
+        order.paypal_order_id = payment["id"]
         db.commit()
 
-        logger.info(f"Paiement Mollie créé: {payment['id']} pour commande {order.order_number}")
+        logger.info(f"Commande PayPal créée: {payment['id']} pour commande {order.order_number}")
 
         return CheckoutResponse(
             order_number=order.order_number,
-            pay_url=payment["checkout_url"],
+            pay_url=payment["approve_url"],
             amount=amount_eur
         )
 
     except Exception as e:
-        # En cas d'erreur Mollie, marquer la commande comme failed
-        logger.error(f"Erreur création paiement Mollie: {e}")
+        # En cas d'erreur PayPal, marquer la commande comme failed
+        logger.error(f"Erreur création commande PayPal: {e}")
         order.status = "failed"
         db.commit()
         raise HTTPException(
@@ -276,19 +268,19 @@ async def create_cart_checkout_session(
     request: Request,  # Required for rate limiting (must be named 'request' for slowapi)
     cart_request: CartCheckoutRequest,
     db: Session = Depends(get_db),
-    mollie: MolliePaymentClient = Depends(get_mollie_client),  # Injection de dépendance
+    paypal: PayPalPaymentClient = Depends(get_paypal_client),  # Injection de dépendance
     app_settings: Settings = Depends(get_settings)  # Injection de dépendance
 ):
     """
-    Crée une session de paiement Mollie pour un panier multi-pack. (Rate limited: 10/min)
+    Crée une session de paiement PayPal pour un panier multi-pack. (Rate limited: 10/min)
 
     Flow:
     1. Valider tous les packs dans le panier avec verrouillage
     2. Vérifier la capacité pour chaque pack
     3. Calculer le montant total
     4. Créer la commande en DB avec OrderItems (status=pending)
-    5. Appeler Mollie pour créer le paiement
-    6. Sauvegarder l'ID du paiement Mollie
+    5. Appeler PayPal pour créer la commande
+    6. Sauvegarder l'ID de la commande PayPal
     7. Retourner l'URL de paiement au frontend
 
     Args:
@@ -301,7 +293,7 @@ async def create_cart_checkout_session(
     Raises:
         HTTPException 404: Si un événement ou pack n'existe pas
         HTTPException 400: Si un pack n'est pas actif ou est sold out
-        HTTPException 500: Si erreur Mollie ou DB
+        HTTPException 500: Si erreur PayPal ou DB
     """
     # 1. Valider tous les articles du panier avec verrouillage
     validated_items = []
@@ -492,42 +484,33 @@ async def create_cart_checkout_session(
             is_pending_cash=False
         )
 
-    # 5. Créer le paiement Mollie (seulement si montant > 0)
+    # 5. Créer la commande PayPal (seulement si montant > 0)
     try:
         # Construire la description
         event = db.query(models.Event).filter(models.Event.id == event_id).first()
         pack_names = [item_data["pack"].name for item_data in validated_items]
         description = f"Billets {event.title} - {', '.join(pack_names)}"
         
-        # Debug: log webhook URL
-        webhook_url = f"{app_settings.base_url}/api/webhooks/mollie"
-        logger.info(f"🔗 Webhook URL pour Mollie: {webhook_url}")
+        logger.info(f"🔗 Création commande PayPal pour panier: {order.order_number}")
 
-        payment = mollie.create_payment(
+        payment = paypal.create_order(
             amount=total_amount_eur,
             description=description,
-            redirect_url=f"{app_settings.frontend_url}/payment/complete?order={order.order_number}",
-            webhook_url=webhook_url,
-            metadata={
-                "order_number": order.order_number,
-                "event_id": str(event_id),
-                "customer_email": cart_request.customer_email,
-                "is_cart": "true",
-                "total_packs": str(len(validated_items))
-            },
-            method="bancontact",  # Forcer Bancontact (ou None pour choix libre)
-            locale="fr_BE"  # Français Belgique
+            return_url=f"{app_settings.frontend_url}/payment/complete?order={order.order_number}",
+            cancel_url=f"{app_settings.frontend_url}/payment/complete?order={order.order_number}&status=cancelled",
+            reference_id=order.order_number,
+            locale="fr-BE"  # Français Belgique
         )
 
-        # 6. Sauvegarder l'ID du paiement Mollie
-        order.mollie_payment_id = payment["id"]
+        # 6. Sauvegarder l'ID de la commande PayPal
+        order.paypal_order_id = payment["id"]
         db.commit()
 
-        logger.info(f"Paiement Mollie créé pour panier: {payment['id']} - {order.order_number}")
+        logger.info(f"Commande PayPal créée pour panier: {payment['id']} - {order.order_number}")
 
         return CartCheckoutResponse(
             order_number=order.order_number,
-            pay_url=payment["checkout_url"],
+            pay_url=payment["approve_url"],
             amount=total_amount_eur,
             total_items=len(validated_items),
             payment_method="online",
@@ -535,8 +518,8 @@ async def create_cart_checkout_session(
         )
 
     except Exception as e:
-        # En cas d'erreur Mollie, marquer la commande comme failed
-        logger.error(f"Erreur création paiement Mollie pour panier: {e}")
+        # En cas d'erreur PayPal, marquer la commande comme failed
+        logger.error(f"Erreur création commande PayPal pour panier: {e}")
         order.status = "failed"
         db.commit()
         raise HTTPException(

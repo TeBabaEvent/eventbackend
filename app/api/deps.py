@@ -138,16 +138,27 @@ def get_settings() -> Settings:
     return settings
 
 
-# ============== MOLLIE CLIENT DEPENDENCY ==============
+# ============== PAYPAL CLIENT DEPENDENCY ==============
+
+def get_paypal_client():
+    """
+    Retourne le client PayPal.
+    
+    Usage:
+        @router.post("/payment")
+        def create_payment(paypal: PayPalPaymentClient = Depends(get_paypal_client)):
+            order = paypal.create_order(...)
+    """
+    from app.services.paypal_client import paypal_client
+    return paypal_client
+
+
+# ============== MOLLIE CLIENT DEPENDENCY (Legacy) ==============
 
 def get_mollie_client():
     """
     Retourne le client Mollie.
-    
-    Usage:
-        @router.post("/payment")
-        def create_payment(mollie: MolliePaymentClient = Depends(get_mollie_client)):
-            payment = mollie.create_payment(...)
+    DEPRECATED: Utiliser get_paypal_client() à la place.
     """
     from app.services.mollie_client import mollie_client
     return mollie_client
