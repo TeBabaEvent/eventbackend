@@ -75,7 +75,8 @@ jinja_env = Environment(
 )
 
 # Thread pool for sync WeasyPrint operations
-_executor = ThreadPoolExecutor(max_workers=2)
+# Augmenté pour permettre la génération parallèle de plusieurs PDFs
+_executor = ThreadPoolExecutor(max_workers=4)
 
 # ============================================
 # HELPERS
@@ -205,6 +206,8 @@ async def generate_individual_ticket_pdfs(tickets: List[Ticket], order: Order) -
     Generate individual PDFs for each ticket in an order.
     Each PDF contains one ticket with a large, centered QR code.
     
+    PDFs are generated in PARALLEL for better performance.
+    
     Args:
         tickets: List of tickets to generate PDFs for
         order: The order containing the tickets
@@ -217,15 +220,18 @@ async def generate_individual_ticket_pdfs(tickets: List[Ticket], order: Order) -
     
     logger.info(f"Generating {len(tickets)} individual ticket PDFs for order {order.order_number}")
     
-    pdf_paths = []
     total_tickets = len(tickets)
     
-    for index, ticket in enumerate(tickets, start=1):
-        pdf_path = await generate_single_ticket_pdf(ticket, order, index, total_tickets)
-        pdf_paths.append(pdf_path)
+    # Générer tous les PDFs en parallèle pour de meilleures performances
+    tasks = [
+        generate_single_ticket_pdf(ticket, order, index, total_tickets)
+        for index, ticket in enumerate(tickets, start=1)
+    ]
+    
+    pdf_paths = await asyncio.gather(*tasks)
     
     logger.info(f"Generated {len(pdf_paths)} individual ticket PDFs for order {order.order_number}")
-    return pdf_paths
+    return list(pdf_paths)
 
 
 # ============================================

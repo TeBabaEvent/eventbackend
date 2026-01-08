@@ -1,6 +1,7 @@
 """Service d'envoi d'emails via Gmail SMTP"""
 import smtplib
 import os
+import asyncio
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.base import MIMEBase
@@ -8,12 +9,16 @@ from email.mime.image import MIMEImage
 from email import encoders
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 from typing import List, Optional, Tuple
+from concurrent.futures import ThreadPoolExecutor
 import logging
 
 from app.db.models import Order, Ticket
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
+
+# Thread pool pour l'envoi d'emails (opération bloquante)
+_email_executor = ThreadPoolExecutor(max_workers=2)
 
 # Chemins
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
@@ -133,9 +138,10 @@ class EmailService:
 
         return msg
 
-    def _send(self, msg: MIMEMultipart):
+    def _send_sync(self, msg: MIMEMultipart):
         """
-        Envoie un message via SMTP Gmail.
+        Envoie un message via SMTP Gmail (opération synchrone).
+        Appelée dans un thread pool pour ne pas bloquer l'event loop.
 
         Args:
             msg: Message MIME à envoyer
@@ -160,6 +166,17 @@ class EmailService:
         except Exception as e:
             logger.error(f"Erreur envoi email: {e}")
             raise
+
+    async def _send(self, msg: MIMEMultipart):
+        """
+        Envoie un message via SMTP Gmail de manière asynchrone.
+        Utilise un thread pool pour ne pas bloquer l'event loop.
+
+        Args:
+            msg: Message MIME à envoyer
+        """
+        loop = asyncio.get_event_loop()
+        await loop.run_in_executor(_email_executor, self._send_sync, msg)
 
     async def send_confirmation(
         self,
@@ -246,7 +263,7 @@ class EmailService:
             embedded_images=embedded_images if embedded_images else None
         )
 
-        self._send(msg)
+        await self._send(msg)
 
     def _generate_simple_confirmation_html(self, data: dict) -> str:
         """
@@ -469,7 +486,7 @@ class EmailService:
             attachments=attachments
         )
 
-        self._send(msg)
+        await self._send(msg)
 
     async def send_refund(
         self,
@@ -662,7 +679,7 @@ class EmailService:
             embedded_images=embedded_images if embedded_images else None
         )
 
-        self._send(msg)
+        await self._send(msg)
 
 
 # Singleton
