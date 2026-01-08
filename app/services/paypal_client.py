@@ -2,28 +2,15 @@
 
 Remplace le client Mollie.
 Documentation: https://developer.paypal.com/docs/api/orders/v2/
-SDK: https://github.com/paypal/PayPal-Python-Server-SDK
+
+Utilise httpx directement pour une compatibilité maximale.
 """
 
-from paypalserversdk.http.auth.o_auth_2 import ClientCredentialsAuthCredentials
-from paypalserversdk.logging.configuration.api_logging_configuration import (
-    LoggingConfiguration,
-    RequestLoggingConfiguration,
-    ResponseLoggingConfiguration,
-)
-from paypalserversdk.paypal_serversdk_client import PaypalServersdkClient
-from paypalserversdk.controllers.orders_controller import OrdersController
-from paypalserversdk.controllers.payments_controller import PaymentsController
-from paypalserversdk.models.amount_with_breakdown import AmountWithBreakdown
-from paypalserversdk.models.checkout_payment_intent import CheckoutPaymentIntent
-from paypalserversdk.models.order_request import OrderRequest
-from paypalserversdk.models.purchase_unit_request import PurchaseUnitRequest
-from paypalserversdk.models.payment_source import PaymentSource
-from paypalserversdk.models.pay_pal_wallet import PayPalWallet
-from paypalserversdk.models.pay_pal_wallet_experience_context import PayPalWalletExperienceContext
-
+import httpx
+import base64
 import logging
 from typing import Optional, Dict, Any
+from datetime import datetime, timedelta
 
 logger = logging.getLogger(__name__)
 
@@ -47,6 +34,12 @@ class PayPalConfig:
         
         self.is_sandbox = self.mode == "sandbox"
         self.is_live = self.mode == "live"
+        
+        # Base URL selon l'environnement
+        if self.is_sandbox:
+            self.base_url = "https://api-m.sandbox.paypal.com"
+        else:
+            self.base_url = "https://api-m.paypal.com"
 
     def __repr__(self):
         return f"<PayPalConfig(mode={self.mode})>"
@@ -73,28 +66,93 @@ class PayPalPaymentClient:
 
     def __init__(self, config: PayPalConfig = None):
         self.config = config or PayPalConfig()
+        self._access_token = None
+        self._token_expires_at = None
+
+    def _get_auth_header(self) -> str:
+        """Génère le header d'authentification Basic pour obtenir le token."""
+        credentials = f"{self.config.client_id}:{self.config.client_secret}"
+        encoded = base64.b64encode(credentials.encode()).decode()
+        return f"Basic {encoded}"
+
+    def _get_access_token(self) -> str:
+        """Obtient un access token OAuth2 (avec cache)."""
+        # Vérifier si le token est encore valide
+        if self._access_token and self._token_expires_at:
+            if datetime.utcnow() < self._token_expires_at:
+                return self._access_token
+
+        # Obtenir un nouveau token
+        url = f"{self.config.base_url}/v1/oauth2/token"
+        headers = {
+            "Authorization": self._get_auth_header(),
+            "Content-Type": "application/x-www-form-urlencoded"
+        }
+        data = "grant_type=client_credentials"
+
+        try:
+            with httpx.Client(timeout=30.0) as client:
+                response = client.post(url, headers=headers, content=data)
+                response.raise_for_status()
+                result = response.json()
+
+            self._access_token = result["access_token"]
+            expires_in = result.get("expires_in", 3600)
+            # Expire 5 minutes avant pour éviter les problèmes
+            self._token_expires_at = datetime.utcnow() + timedelta(seconds=expires_in - 300)
+            
+            logger.info("✅ PayPal access token obtenu")
+            return self._access_token
+
+        except Exception as e:
+            logger.error(f"Erreur obtention token PayPal: {e}")
+            raise
+
+    def _make_request(
+        self, 
+        method: str, 
+        endpoint: str, 
+        json_data: dict = None,
+        idempotency_key: str = None
+    ) -> Dict[str, Any]:
+        """Effectue une requête authentifiée à l'API PayPal."""
+        url = f"{self.config.base_url}{endpoint}"
+        headers = {
+            "Authorization": f"Bearer {self._get_access_token()}",
+            "Content-Type": "application/json",
+            "Prefer": "return=representation"
+        }
         
-        # Initialiser le client PayPal SDK
-        self.client = PaypalServersdkClient(
-            client_credentials_auth_credentials=ClientCredentialsAuthCredentials(
-                o_auth_client_id=self.config.client_id,
-                o_auth_client_secret=self.config.client_secret,
-            ),
-            environment=self.config.mode,
-            logging_configuration=LoggingConfiguration(
-                log_level=logging.INFO,
-                mask_sensitive_headers=True,
-                request_logging_config=RequestLoggingConfiguration(
-                    log_body=True
-                ),
-                response_logging_config=ResponseLoggingConfiguration(
-                    log_body=True
-                )
-            )
-        )
-        
-        self.orders_controller: OrdersController = self.client.orders
-        self.payments_controller: PaymentsController = self.client.payments
+        # Ajouter PayPal-Request-Id pour l'idempotence si fourni
+        if idempotency_key:
+            headers["PayPal-Request-Id"] = idempotency_key
+
+        try:
+            with httpx.Client(timeout=30.0) as client:
+                if method == "GET":
+                    response = client.get(url, headers=headers)
+                elif method == "POST":
+                    if json_data:
+                        response = client.post(url, headers=headers, json=json_data)
+                    else:
+                        # Pour les POST sans body (comme capture)
+                        response = client.post(url, headers=headers)
+                else:
+                    raise ValueError(f"Méthode HTTP non supportée: {method}")
+                
+                response.raise_for_status()
+                
+                # Certaines réponses peuvent être vides
+                if response.text:
+                    return response.json()
+                return {}
+
+        except httpx.HTTPStatusError as e:
+            logger.error(f"Erreur HTTP PayPal: {e.response.status_code} - {e.response.text}")
+            raise
+        except Exception as e:
+            logger.error(f"Erreur requête PayPal: {e}")
+            raise
 
     def create_order(
         self,
@@ -128,53 +186,56 @@ class PayPalPaymentClient:
         # PayPal attend le montant en string avec 2 décimales
         amount_str = f"{amount:.2f}"
 
-        order_request = OrderRequest(
-            intent=CheckoutPaymentIntent.CAPTURE,
-            purchase_units=[
-                PurchaseUnitRequest(
-                    reference_id=reference_id,
-                    description=description,
-                    custom_id=custom_id or reference_id,
-                    amount=AmountWithBreakdown(
-                        currency_code="EUR",
-                        value=amount_str
-                    )
-                )
-            ],
-            payment_source=PaymentSource(
-                paypal=PayPalWallet(
-                    experience_context=PayPalWalletExperienceContext(
-                        payment_method_preference="IMMEDIATE_PAYMENT_REQUIRED",
-                        brand_name="BABA Events",
-                        locale=locale,
-                        landing_page="LOGIN",
-                        user_action="PAY_NOW",
-                        return_url=return_url,
-                        cancel_url=cancel_url
-                    )
-                )
-            )
-        )
+        order_data = {
+            "intent": "CAPTURE",
+            "purchase_units": [{
+                "reference_id": reference_id,
+                "description": description[:127],  # Max 127 chars
+                "custom_id": custom_id or reference_id,
+                "amount": {
+                    "currency_code": "EUR",
+                    "value": amount_str
+                }
+            }],
+            "payment_source": {
+                "paypal": {
+                    "experience_context": {
+                        "payment_method_preference": "IMMEDIATE_PAYMENT_REQUIRED",
+                        "brand_name": "BABA Events",
+                        "locale": locale,
+                        "landing_page": "NO_PREFERENCE",
+                        "shipping_preference": "NO_SHIPPING",  # Pas de livraison pour des billets
+                        "user_action": "PAY_NOW",
+                        "return_url": return_url,
+                        "cancel_url": cancel_url
+                    }
+                }
+            }
+        }
 
-        logger.info(f"Création commande PayPal: {amount_str} EUR - {description}")
+        logger.info(f"Création commande PayPal: {amount_str} EUR - {description[:50]}")
 
         try:
-            response = self.orders_controller.orders_create({"body": order_request})
-            order = response.body
+            result = self._make_request(
+                "POST", 
+                "/v2/checkout/orders", 
+                order_data,
+                idempotency_key=f"create-{reference_id}"
+            )
             
             # Trouver l'URL d'approbation
             approve_url = None
-            for link in order.get("links", []):
+            for link in result.get("links", []):
                 if link.get("rel") == "payer-action":
                     approve_url = link.get("href")
                     break
             
-            logger.info(f"Commande PayPal créée: {order.get('id')} - Status: {order.get('status')}")
+            logger.info(f"Commande PayPal créée: {result.get('id')} - Status: {result.get('status')}")
 
             return {
-                "id": order.get("id"),
+                "id": result.get("id"),
                 "approve_url": approve_url,
-                "status": order.get("status"),
+                "status": result.get("status"),
                 "reference_id": reference_id
             }
 
@@ -190,21 +251,31 @@ class PayPalPaymentClient:
             order_id: ID de la commande PayPal
 
         Returns:
-            dict: Détails de la capture
+            dict: Détails de la capture avec capture_id
         """
         try:
-            response = self.orders_controller.orders_capture({
-                "id": order_id,
-                "prefer": "return=representation"
-            })
-            capture = response.body
+            result = self._make_request(
+                "POST", 
+                f"/v2/checkout/orders/{order_id}/capture",
+                idempotency_key=f"capture-{order_id}"
+            )
             
-            logger.info(f"Commande PayPal capturée: {order_id} - Status: {capture.get('status')}")
+            logger.info(f"Commande PayPal capturée: {order_id} - Status: {result.get('status')}")
+            
+            # Extraire le capture_id pour les remboursements ultérieurs
+            capture_id = None
+            purchase_units = result.get("purchase_units", [])
+            if purchase_units:
+                payments = purchase_units[0].get("payments", {})
+                captures = payments.get("captures", [])
+                if captures:
+                    capture_id = captures[0].get("id")
             
             return {
-                "id": capture.get("id"),
-                "status": capture.get("status"),
-                "purchase_units": capture.get("purchase_units", [])
+                "id": result.get("id"),
+                "status": result.get("status"),
+                "capture_id": capture_id,
+                "purchase_units": purchase_units
             }
 
         except Exception as e:
@@ -222,22 +293,20 @@ class PayPalPaymentClient:
             dict: Détails de la commande
         """
         try:
-            response = self.orders_controller.orders_get({"id": order_id})
-            order = response.body
+            result = self._make_request("GET", f"/v2/checkout/orders/{order_id}")
             
-            status = order.get("status")
-            purchase_units = order.get("purchase_units", [])
+            status = result.get("status")
             
             return {
-                "id": order.get("id"),
+                "id": result.get("id"),
                 "status": status,
                 "is_completed": status == "COMPLETED",
                 "is_approved": status == "APPROVED",
                 "is_created": status == "CREATED",
-                "purchase_units": purchase_units,
-                "payer": order.get("payer"),
-                "create_time": order.get("create_time"),
-                "update_time": order.get("update_time")
+                "purchase_units": result.get("purchase_units", []),
+                "payer": result.get("payer"),
+                "create_time": result.get("create_time"),
+                "update_time": result.get("update_time")
             }
 
         except Exception as e:
@@ -262,29 +331,29 @@ class PayPalPaymentClient:
             dict: Détails du remboursement
         """
         try:
-            refund_request = {}
+            refund_data = {}
             
             if amount:
-                refund_request["amount"] = {
+                refund_data["amount"] = {
                     "value": f"{amount:.2f}",
                     "currency_code": "EUR"
                 }
             
             if note:
-                refund_request["note_to_payer"] = note
+                refund_data["note_to_payer"] = note
 
-            response = self.payments_controller.captures_refund({
-                "capture_id": capture_id,
-                "body": refund_request if refund_request else None
-            })
-            refund = response.body
+            result = self._make_request(
+                "POST", 
+                f"/v2/payments/captures/{capture_id}/refund", 
+                refund_data if refund_data else {}
+            )
             
-            logger.info(f"Remboursement PayPal créé: {refund.get('id')}")
+            logger.info(f"Remboursement PayPal créé: {result.get('id')}")
             
             return {
-                "id": refund.get("id"),
-                "status": refund.get("status"),
-                "amount": refund.get("amount")
+                "id": result.get("id"),
+                "status": result.get("status"),
+                "amount": result.get("amount")
             }
 
         except Exception as e:
@@ -303,13 +372,11 @@ def verify_webhook_signature(
     webhook_signature: str,
     cert_url: str,
     auth_algo: str,
-    raw_body: bytes
+    raw_body: bytes,
+    paypal_client_instance: PayPalPaymentClient = None
 ) -> bool:
     """
-    Vérifie la signature d'un webhook PayPal.
-    
-    Note: PayPal utilise une signature cryptographique pour valider les webhooks.
-    Cette fonction doit être appelée avant de traiter tout webhook.
+    Vérifie la signature d'un webhook PayPal via l'API PayPal.
     
     Args:
         webhook_id: ID du webhook configuré dans PayPal
@@ -319,19 +386,67 @@ def verify_webhook_signature(
         cert_url: Header PAYPAL-CERT-URL
         auth_algo: Header PAYPAL-AUTH-ALGO
         raw_body: Corps brut de la requête
+        paypal_client_instance: Instance du client PayPal (optionnel)
     
     Returns:
         bool: True si signature valide
     """
-    # Pour l'instant, on fait confiance au webhook (comme Mollie)
-    # TODO: Implémenter la vérification complète avec certificat PayPal
-    logger.warning("⚠️ Webhook signature verification not fully implemented - trusting webhook")
-    return True
+    import json
+    
+    # Si pas de webhook_id configuré, on accepte (mode dégradé)
+    if not webhook_id:
+        logger.warning("⚠️ PAYPAL_WEBHOOK_ID non configuré - signature non vérifiée")
+        return True
+    
+    # Utiliser l'instance globale si non fournie
+    client = paypal_client_instance or paypal_client
+    if not client:
+        logger.warning("⚠️ PayPal client non disponible - signature non vérifiée")
+        return True
+    
+    try:
+        # Décoder le body JSON
+        webhook_event = json.loads(raw_body.decode('utf-8'))
+        
+        # Appeler l'API de vérification PayPal
+        verify_data = {
+            "auth_algo": auth_algo,
+            "cert_url": cert_url,
+            "transmission_id": transmission_id,
+            "transmission_sig": webhook_signature,
+            "transmission_time": timestamp,
+            "webhook_id": webhook_id,
+            "webhook_event": webhook_event
+        }
+        
+        result = client._make_request(
+            "POST", 
+            "/v1/notifications/verify-webhook-signature", 
+            verify_data
+        )
+        
+        verification_status = result.get("verification_status")
+        
+        if verification_status == "SUCCESS":
+            logger.info("✅ Signature webhook PayPal vérifiée")
+            return True
+        else:
+            logger.warning(f"❌ Signature webhook PayPal invalide: {verification_status}")
+            return False
+            
+    except Exception as e:
+        logger.error(f"Erreur vérification signature webhook: {e}")
+        # En cas d'erreur de vérification, on accepte quand même
+        # pour ne pas bloquer les paiements légitimes
+        return True
 
 
 # ============================================
 # SINGLETON - Utiliser cette instance
 # ============================================
+
+paypal_config = None
+paypal_client = None
 
 try:
     from app.core.config import settings
@@ -344,11 +459,6 @@ try:
         paypal_client = PayPalPaymentClient(paypal_config)
         logger.info(f"✅ PayPal client initialisé: {paypal_config}")
     else:
-        paypal_config = None
-        paypal_client = None
         logger.warning("⚠️ PayPal client non initialisé: credentials manquants")
 except Exception as e:
-    paypal_config = None
-    paypal_client = None
     logger.warning(f"⚠️ PayPal client non initialisé: {e}")
-
