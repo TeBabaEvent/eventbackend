@@ -689,6 +689,259 @@ class EmailService:
         await self._send(msg)
 
 
+    async def send_pending_cash_reservation(
+        self,
+        to_email: str,
+        customer_name: str,
+        order: Order
+    ):
+        """
+        Envoie un email de réservation en attente de paiement cash.
+        SANS QR codes - le client doit venir payer sur place.
+
+        Args:
+            to_email: Email du client
+            customer_name: Nom du client
+            order: Commande en attente
+        """
+        logger.info(f"Envoi email réservation cash à {to_email}")
+
+        # Récupérer le logo si disponible
+        logo_data = self._get_logo()
+        logo_cid = "logo" if logo_data else None
+        
+        # Générer le header avec ou sans logo
+        if logo_cid:
+            logo_html = f'<img src="cid:{logo_cid}" alt="BABA Event" style="height: 60px; width: auto; max-width: 200px;">'
+        else:
+            logo_html = '<h1 style="color: #dc143c; margin: 0; font-size: 32px; font-weight: 800; letter-spacing: 3px; text-transform: uppercase;">BABA EVENT</h1>'
+
+        # Utiliser les propriétés helper du modèle Order
+        pack_items = order.pack_items_list
+        pack_display = order.pack_display
+        
+        # Build pack breakdown HTML
+        pack_html = ""
+        if len(pack_items) > 1:
+            pack_html = "".join([
+                f'<div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #1a1a1e;"><span style="color: #a0a0a0;">{p["name"]}</span><span style="color: #fff;">x{p["quantity"]}</span></div>'
+                for p in pack_items
+            ])
+        else:
+            pack_html = f'<div style="color: #a0a0a0;">{pack_display}</div>'
+
+        # Numéro WhatsApp
+        whatsapp_number = "+32470123456"  # À configurer
+        whatsapp_link = f"https://wa.me/{whatsapp_number.replace('+', '').replace(' ', '')}"
+
+        html = f"""
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Réservation en attente - BABA Event</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #0a0a0f; color: #ffffff;">
+    <!-- Wrapper -->
+    <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #0a0a0f;">
+        <tr>
+            <td align="center" style="padding: 20px 10px;">
+                <!-- Main Container -->
+                <table width="100%" cellpadding="0" cellspacing="0" style="max-width: 600px; background-color: #0a0a0f;">
+                    
+                    <!-- Header / Logo -->
+                    <tr>
+                        <td style="padding: 40px 30px 20px; text-align: center;">
+                            {logo_html}
+                        </td>
+                    </tr>
+
+                    <!-- Greeting -->
+                    <tr>
+                        <td style="padding: 20px 30px; text-align: center;">
+                            <h2 style="color: #ffffff; margin: 0 0 12px; font-size: 26px; font-weight: 700;">
+                                Réservation en attente
+                            </h2>
+                            <p style="color: #909090; font-size: 15px; line-height: 1.6; margin: 0;">
+                                Bonjour {customer_name},<br>
+                                Votre réservation a bien été enregistrée.
+                            </p>
+                        </td>
+                    </tr>
+
+                    <!-- Warning Box - Important -->
+                    <tr>
+                        <td style="padding: 0 30px 20px;">
+                            <table width="100%" cellpadding="0" cellspacing="0" style="background: #2d2510; border: 1px solid #4a3d1a; border-radius: 12px;">
+                                <tr>
+                                    <td style="padding: 20px 24px;">
+                                        <p style="color: #fbbf24; margin: 0 0 10px; font-size: 15px; font-weight: 700;">
+                                            ⚠️ Paiement en attente
+                                        </p>
+                                        <p style="color: #a0a0a0; margin: 0; font-size: 14px; line-height: 1.7;">
+                                            Cette réservation <strong style="color: #fff;">n'est pas encore confirmée</strong>. Vous devez venir payer sur place pour valider vos billets.<br><br>
+                                            <strong style="color: #fbbf24;">Important :</strong> Les places ne sont pas garanties tant que le paiement n'est pas effectué. Les paiements en ligne sont prioritaires.
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+
+                    <!-- Order Card -->
+                    <tr>
+                        <td style="padding: 0 30px 20px;">
+                            <table width="100%" cellpadding="0" cellspacing="0" style="background: #141418; border: 1px solid #2a2a2e; border-radius: 16px; overflow: hidden;">
+                                
+                                <!-- Order Header -->
+                                <tr>
+                                    <td style="padding: 18px 24px; background: #1a1a1e; border-bottom: 1px solid #2a2a2e;">
+                                        <table width="100%" cellpadding="0" cellspacing="0">
+                                            <tr>
+                                                <td>
+                                                    <span style="color: #ffffff; font-family: 'Courier New', Consolas, monospace; font-size: 14px; font-weight: 700; letter-spacing: 0.5px;">{order.order_number}</span>
+                                                </td>
+                                                <td style="text-align: right;">
+                                                    <span style="background: #3d3510; color: #fbbf24; padding: 5px 14px; border-radius: 20px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">En attente</span>
+                                                </td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+
+                                <!-- Order Details -->
+                                <tr>
+                                    <td style="padding: 28px 24px;">
+                                        <!-- Event Title -->
+                                        <h3 style="color: #ffffff; margin: 0 0 20px; font-size: 22px; font-weight: 700; line-height: 1.3;">{order.event.title}</h3>
+                                        
+                                        <!-- Event Info -->
+                                        <table width="100%" cellpadding="0" cellspacing="0">
+                                            <tr>
+                                                <td style="padding: 8px 0; color: #e0e0e0; font-size: 14px;">📅 {order.event.date} à {order.event.time}</td>
+                                            </tr>
+                                            <tr>
+                                                <td style="padding: 8px 0; color: #e0e0e0; font-size: 14px;">📍 {order.event.location}, {order.event.city}</td>
+                                            </tr>
+                                        </table>
+
+                                        <!-- Divider -->
+                                        <div style="height: 1px; background: #2a2a2e; margin: 20px 0;"></div>
+
+                                        <!-- Pack Details -->
+                                        <table width="100%" cellpadding="0" cellspacing="0">
+                                            <tr>
+                                                <td style="padding: 8px 0; color: #707070; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px;">Billets réservés</td>
+                                                <td style="padding: 8px 0; color: #ffffff; font-size: 15px; font-weight: 600; text-align: right;">{order.total_quantity}</td>
+                                            </tr>
+                                        </table>
+                                        
+                                        {pack_html}
+
+                                        <!-- Divider -->
+                                        <div style="height: 1px; background: #2a2a2e; margin: 20px 0;"></div>
+
+                                        <!-- Amount to Pay -->
+                                        <table width="100%" cellpadding="0" cellspacing="0">
+                                            <tr>
+                                                <td style="color: #707070; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px;">Montant à payer</td>
+                                                <td style="color: #fbbf24; font-size: 24px; font-weight: 800; text-align: right;">{order.amount / 100:.2f} €</td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+
+                    <!-- WhatsApp Contact -->
+                    <tr>
+                        <td style="padding: 0 30px 20px;">
+                            <table width="100%" cellpadding="0" cellspacing="0" style="background: #0f2920; border: 1px solid #1a4a35; border-radius: 12px;">
+                                <tr>
+                                    <td style="padding: 22px 24px;">
+                                        <p style="color: #10b981; margin: 0 0 10px; font-size: 15px; font-weight: 700;">
+                                            📱 Une question ?
+                                        </p>
+                                        <p style="color: #a0a0a0; margin: 0 0 15px; font-size: 14px; line-height: 1.7;">
+                                            Contactez-nous sur WhatsApp pour plus d'informations sur votre réservation.
+                                        </p>
+                                        <a href="{whatsapp_link}" style="display: inline-block; background: #25D366; color: #fff; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px;">
+                                            💬 Contacter via WhatsApp
+                                        </a>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+
+                    <!-- Instructions -->
+                    <tr>
+                        <td style="padding: 0 30px 30px;">
+                            <table width="100%" cellpadding="0" cellspacing="0" style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px;">
+                                <tr>
+                                    <td style="padding: 22px 24px;">
+                                        <p style="color: #808080; margin: 0 0 10px; font-size: 15px; font-weight: 600;">
+                                            Comment ça marche ?
+                                        </p>
+                                        <ol style="color: #a0a0a0; margin: 0; font-size: 14px; line-height: 2; padding-left: 20px;">
+                                            <li>Présentez-vous à l'entrée avec ce numéro de réservation : <strong style="color: #fff;">{order.order_number}</strong></li>
+                                            <li>Payez le montant dû en espèces</li>
+                                            <li>Recevez vos billets avec QR codes par email</li>
+                                        </ol>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+
+                    <!-- Contact -->
+                    <tr>
+                        <td style="padding: 0 30px 40px; text-align: center;">
+                            <p style="color: #505050; font-size: 14px; margin: 0; line-height: 1.7;">
+                                Une question ? Contactez-nous sur<br>
+                                <a href="mailto:contact@baba.events" style="color: #dc143c; text-decoration: none; font-weight: 600;">contact@baba.events</a>
+                            </p>
+                        </td>
+                    </tr>
+
+                    <!-- Footer -->
+                    <tr>
+                        <td style="padding: 30px; text-align: center; border-top: 1px solid #1a1a1e;">
+                            <p style="color: #404040; font-size: 12px; margin: 0 0 8px; line-height: 1.5;">
+                                © 2025 BABA Event - Tous droits réservés
+                            </p>
+                            <p style="color: #303030; font-size: 11px; margin: 0; line-height: 1.5;">
+                                Cet email concerne votre réservation {order.order_number}
+                            </p>
+                        </td>
+                    </tr>
+
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>
+        """
+
+        # Préparer les images embarquées pour le logo
+        embedded_images = []
+        if logo_data:
+            img_bytes, content_type, _ = logo_data
+            embedded_images.append((img_bytes, "logo", content_type))
+
+        msg = self._create_message(
+            to_email=to_email,
+            subject=f"Réservation en attente - {order.event.title}",
+            html_content=html,
+            embedded_images=embedded_images if embedded_images else None
+        )
+
+        await self._send(msg)
+
+
 # Singleton
 email_service = EmailService()
 
@@ -707,3 +960,8 @@ async def send_reminder_email(to_email, customer_name, order, pdf_paths):
 async def send_refund_email(to_email, customer_name, order, amount):
     """Helper pour background tasks"""
     await email_service.send_refund(to_email, customer_name, order, amount)
+
+
+async def send_pending_cash_reservation_email(to_email, customer_name, order):
+    """Helper pour envoyer un email de réservation cash en attente"""
+    await email_service.send_pending_cash_reservation(to_email, customer_name, order)

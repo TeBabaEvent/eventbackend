@@ -123,6 +123,7 @@ class AdminOrderService:
             "total_quantity": order.total_quantity,
             "amount": order.amount / 100,
             "status": order.status,
+            "payment_method": getattr(order, 'payment_method', 'online') or 'online',
             "mollie_payment_id": order.mollie_payment_id,
             "payment_failure_reason": getattr(order, 'payment_failure_reason', None),
             "created_at": order.created_at.isoformat() if order.created_at else None,
@@ -146,6 +147,7 @@ class AdminOrderService:
             "total_quantity": order.total_quantity,
             "amount": order.amount / 100,
             "status": order.status,
+            "payment_method": getattr(order, 'payment_method', 'online') or 'online',
             "mollie_payment_id": order.mollie_payment_id,
             "created_at": order.created_at.isoformat() if order.created_at else None,
             "paid_at": order.paid_at.isoformat() if order.paid_at else None
@@ -170,6 +172,7 @@ class AdminOrderService:
             "global_revenue": float(global_revenue_centimes) / 100,
             "global_completed": status_counts.get("completed", 0),
             "global_pending": status_counts.get("pending", 0),
+            "global_pending_cash": status_counts.get("pending_cash", 0),
             "global_failed": status_counts.get("failed", 0)
         }
 

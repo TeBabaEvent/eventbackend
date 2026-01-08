@@ -25,6 +25,14 @@ class CartCheckoutRequest(BaseModel):
     customer_name: str
     customer_email: EmailStr
     customer_phone: str | None = None
+    payment_method: str = "online"  # online, cash
+
+    @field_validator('payment_method')
+    @classmethod
+    def validate_payment_method(cls, v):
+        if v not in ['online', 'cash']:
+            raise ValueError('Méthode de paiement invalide. Utilisez "online" ou "cash"')
+        return v
 
     @field_validator('items')
     @classmethod
@@ -57,3 +65,5 @@ class CartCheckoutResponse(BaseModel):
     pay_url: str
     amount: float  # En EUR
     total_items: int
+    payment_method: str = "online"  # online, cash
+    is_pending_cash: bool = False  # True si réservation cash en attente

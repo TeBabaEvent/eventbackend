@@ -23,6 +23,7 @@ class OrderListItem(BaseModel):
     total_quantity: int
     amount: float
     status: str
+    payment_method: str = "online"  # online, cash
     mollie_payment_id: Optional[str]
     created_at: str
     paid_at: Optional[str]
@@ -41,6 +42,7 @@ class OrdersListResponse(BaseModel):
     global_revenue: float
     global_completed: int
     global_pending: int
+    global_pending_cash: int = 0  # Réservations cash en attente
     global_failed: int
 
 
@@ -75,6 +77,7 @@ class OrderDetail(BaseModel):
     total_quantity: int
     amount: float
     status: str
+    payment_method: str = "online"  # online, cash
     mollie_payment_id: Optional[str]
     payment_failure_reason: Optional[str]
     created_at: str

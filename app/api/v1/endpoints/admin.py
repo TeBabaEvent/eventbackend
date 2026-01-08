@@ -208,6 +208,118 @@ async def refund_order(
 
 
 @router.post(
+    "/orders/{order_id}/mark-paid",
+    response_model=ResendEmailResponse,
+    status_code=status.HTTP_200_OK,
+    responses={
+        400: {"description": "Order is not a pending cash reservation"},
+        404: {"description": "Order not found"},
+        500: {"description": "Error processing payment"}
+    }
+)
+async def mark_cash_reservation_paid(
+    order_id: str,
+    db: Session = Depends(get_db),
+    admin: models.User = Depends(require_admin)
+):
+    """
+    Marquer une réservation cash comme payée.
+    
+    Cette action:
+    1. Change le statut de "pending_cash" à "completed"
+    2. Met à jour les compteurs sold_count
+    3. Génère les tickets avec QR codes
+    4. Envoie l'email de confirmation avec les billets
+    
+    Args:
+        order_id: ID de la commande
+        
+    Returns:
+        ResendEmailResponse avec résultat
+        
+    Raises:
+        HTTPException 404: Si la commande n'existe pas
+        HTTPException 400: Si la commande n'est pas une réservation cash en attente
+    """
+    logger.info(f"Admin {admin.username} marque réservation cash {order_id} comme payée")
+    
+    # 1. Récupérer la commande
+    order = db.query(models.Order).filter(models.Order.id == order_id).first()
+    
+    if not order:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Commande non trouvée")
+    
+    # Vérifier que c'est une réservation cash en attente
+    if order.status != "pending_cash":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Cette commande n'est pas une réservation cash en attente (statut: {order.status})"
+        )
+    
+    try:
+        # 2. Mettre à jour le statut
+        order.status = "completed"
+        order.paid_at = datetime.utcnow()
+        
+        # 3. Mettre à jour les compteurs sold_count pour chaque pack
+        if order.items and len(order.items) > 0:
+            # Multi-pack order
+            for item in order.items:
+                event_pack = db.query(models.EventPack).filter(
+                    models.EventPack.event_id == item.event_id,
+                    models.EventPack.pack_id == item.pack_id
+                ).with_for_update().first()
+                
+                if event_pack:
+                    event_pack.sold_count = (event_pack.sold_count or 0) + item.quantity
+        elif order.pack_id:
+            # Legacy single-pack order
+            event_pack = db.query(models.EventPack).filter(
+                models.EventPack.event_id == order.event_id,
+                models.EventPack.pack_id == order.pack_id
+            ).with_for_update().first()
+            
+            if event_pack:
+                event_pack.sold_count = (event_pack.sold_count or 0) + (order.quantity or 0)
+        
+        db.commit()
+        db.refresh(order)
+        
+        # 4. Générer les tickets
+        tickets = await generate_tickets_for_order(order, db)
+        
+        # 5. Générer les PDFs et envoyer l'email
+        pdf_paths = await generate_individual_ticket_pdfs(tickets, order)
+        
+        await send_confirmation_email(
+            to_email=order.customer_email,
+            customer_name=order.customer_name,
+            order=order,
+            tickets=tickets,
+            pdf_paths=pdf_paths
+        )
+        
+        logger.info(f"Réservation cash {order.order_number} marquée payée, {len(tickets)} tickets générés")
+        
+        # 6. Nettoyer les PDFs après envoi réussi
+        for pdf_path in pdf_paths:
+            delete_pdf_file(pdf_path)
+        
+        return ResendEmailResponse(
+            success=True,
+            message=f"Paiement confirmé ! {len(tickets)} billets envoyés à {order.customer_email}"
+        )
+        
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Erreur lors du marquage payé: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erreur lors du traitement du paiement: {str(e)}"
+        )
+
+
+@router.post(
     "/orders/{order_id}/resend-email",
     response_model=ResendEmailResponse,
     status_code=status.HTTP_200_OK,

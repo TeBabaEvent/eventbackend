@@ -410,7 +410,40 @@ async def create_cart_checkout_session(
 
     logger.info(f"Commande panier créée: {order_number} - {len(validated_items)} packs - {total_amount_eur}€")
 
-    # 4.5. Gestion spéciale pour les commandes gratuites (0€)
+    # 4.5. Gestion du paiement cash
+    if cart_request.payment_method == "cash":
+        logger.info(f"Réservation cash détectée: {order_number}")
+        
+        order.payment_method = "cash"
+        order.status = "pending_cash"  # Statut spécial pour les réservations cash
+        order.expires_at = None  # Pas d'expiration pour les réservations cash
+        db.commit()
+        db.refresh(order)
+        
+        # Envoyer l'email de réservation en attente (sans QR codes)
+        from app.services.email_service import send_pending_cash_reservation_email
+        
+        try:
+            await send_pending_cash_reservation_email(
+                to_email=order.customer_email,
+                customer_name=order.customer_name,
+                order=order
+            )
+            logger.info(f"Email réservation cash envoyé pour commande {order_number}")
+        except Exception as e:
+            logger.error(f"Erreur envoi email réservation cash: {e}")
+        
+        # Retourner une réponse sans URL de paiement
+        return CartCheckoutResponse(
+            order_number=order.order_number,
+            pay_url=f"{app_settings.frontend_url}/payment/complete?order={order.order_number}",
+            amount=total_amount_eur,
+            total_items=len(validated_items),
+            payment_method="cash",
+            is_pending_cash=True
+        )
+    
+    # 4.6. Gestion spéciale pour les commandes gratuites (0€)
     if total_amount_eur == 0:
         logger.info(f"Commande panier gratuite détectée: {order_number}")
 
@@ -454,7 +487,9 @@ async def create_cart_checkout_session(
             order_number=order.order_number,
             pay_url=f"{settings.frontend_url}/payment/complete?order={order.order_number}",
             amount=0.0,
-            total_items=len(validated_items)
+            total_items=len(validated_items),
+            payment_method="online",
+            is_pending_cash=False
         )
 
     # 5. Créer le paiement Mollie (seulement si montant > 0)
@@ -494,7 +529,9 @@ async def create_cart_checkout_session(
             order_number=order.order_number,
             pay_url=payment["checkout_url"],
             amount=total_amount_eur,
-            total_items=len(validated_items)
+            total_items=len(validated_items),
+            payment_method="online",
+            is_pending_cash=False
         )
 
     except Exception as e:

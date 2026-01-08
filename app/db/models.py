@@ -234,7 +234,8 @@ class Order(Base):
     amount = Column(Integer, nullable=False)  # En centimes (stockage interne)
     status = Column(String(20), default="pending", nullable=False, index=True)  # pending, completed, failed, refunded
 
-    # Payment Provider (Mollie)
+    # Payment Method & Provider
+    payment_method = Column(String(20), default="online", nullable=False)  # online, cash
     mollie_payment_id = Column(String(50), nullable=True, index=True)  # ID paiement Mollie (tr_xxx)
 
     # Informations client
