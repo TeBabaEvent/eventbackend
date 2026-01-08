@@ -11,6 +11,7 @@ from app.db import models
 from app.schemas import event as schemas
 from app.api.deps import require_admin
 from app.utils.serializers import serialize_event
+from app.utils.slugify import generate_unique_slug
 
 logger = logging.getLogger(__name__)
 
@@ -122,6 +123,22 @@ def get_events(
     return [serialize_event(event) for event in events]
 
 
+@router.get("/by-slug/{slug}")
+def get_event_by_slug(
+    slug: str = Path(..., description="Slug de l'événement"),
+    db: Session = Depends(get_db)
+):
+    """Récupérer un événement par son slug - Pour les URLs publiques SEO-friendly"""
+    event = db.query(models.Event).options(
+        joinedload(models.Event.artist_associations).joinedload(models.EventArtist.artist),
+        joinedload(models.Event.pack_associations).joinedload(models.EventPack.pack)
+    ).filter(models.Event.slug == slug).first()
+    
+    if not event:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Événement non trouvé")
+    return serialize_event(event)
+
+
 @router.get("/{event_id}")
 def get_event(
     event_id: str = Path(..., description="ID de l'événement (UUID)", min_length=36, max_length=36),
@@ -153,6 +170,9 @@ def create_event(
         # Créer l'événement sans les relations
         event_data = event.model_dump(exclude={"artists", "packs"})
         db_event = models.Event(**event_data)
+        
+        # Générer le slug unique
+        db_event.slug = generate_unique_slug(db_event.title, db_event.date, db)
         
         # Ajouter l'événement d'abord pour avoir l'ID
         db.add(db_event)
@@ -215,8 +235,13 @@ def update_event(
         packs_info = event.packs
         
         # Mettre à jour les champs simples
-        for key, value in event.model_dump(exclude_unset=True, exclude={"artists", "packs"}).items():
+        update_data = event.model_dump(exclude_unset=True, exclude={"artists", "packs"})
+        for key, value in update_data.items():
             setattr(db_event, key, value)
+        
+        # Régénérer le slug si le titre ou la date a changé
+        if "title" in update_data or "date" in update_data:
+            db_event.slug = generate_unique_slug(db_event.title, db_event.date, db, event_id)
         
         # Mettre à jour les artistes si fournis
         if artists_info is not None:

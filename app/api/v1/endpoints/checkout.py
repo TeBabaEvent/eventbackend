@@ -557,6 +557,7 @@ def get_order_status(request: Request, order_number: str, db: Session = Depends(
         "amount": order.amount / 100,  # Convertir en EUR
         "event_name": order.event.title,
         "event_id": order.event.id,
+        "event_slug": order.event.slug,  # Slug pour les URLs SEO-friendly
         "quantity": order.total_quantity,  # Utiliser la propriété pour supporter les deux systèmes
         "pack_display": order.pack_display,  # Résumé des packs achetés
         "pack_items": order.pack_items_list,  # Détail des packs

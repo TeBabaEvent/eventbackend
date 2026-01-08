@@ -57,6 +57,7 @@ def serialize_event(db_event: models.Event) -> dict:
     # Retourner le dict complet de l'événement
     return {
         "id": db_event.id,
+        "slug": db_event.slug,
         "title": db_event.title,
         "title_translations": db_event.title_translations,
         "description": db_event.description,

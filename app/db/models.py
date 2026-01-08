@@ -82,6 +82,7 @@ class Event(Base):
     __tablename__ = "events"
     
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    slug = Column(String(300), unique=True, nullable=True, index=True)  # URL-friendly slug (nullable pour migration)
     title = Column(String(255), nullable=False, index=True)  # Titre principal (langue par défaut)
     title_translations = Column(JSON, nullable=True)  # {"fr": "", "en": "", "nl": "", "sq": ""}
     description = Column(Text, nullable=False)  # Description principale (langue par défaut)
