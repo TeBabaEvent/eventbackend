@@ -67,3 +67,5 @@ class CartCheckoutResponse(BaseModel):
     total_items: int
     payment_method: str = "online"  # online, cash
     is_pending_cash: bool = False  # True si réservation cash en attente
+    paypal_order_id: str | None = None
+

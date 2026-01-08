@@ -185,6 +185,7 @@ class PayPalPaymentClient:
         # PayPal attend le montant en string avec 2 décimales
         amount_str = f"{amount:.2f}"
 
+        # Construction du payload
         order_data = {
             "intent": "CAPTURE",
             "purchase_units": [{
@@ -195,21 +196,39 @@ class PayPalPaymentClient:
                     "currency_code": "EUR",
                     "value": amount_str
                 }
-            }],
-            "payment_source": {
-                "paypal": {
-                    "experience_context": {
-                        "payment_method_preference": "IMMEDIATE_PAYMENT_REQUIRED",
-                        "brand_name": "BABA Events",
-                        "locale": locale,
-                        "landing_page": "NO_PREFERENCE",
-                        "shipping_preference": "NO_SHIPPING",  # Pas de livraison pour des billets
-                        "user_action": "PAY_NOW",
-                        "return_url": return_url,
-                        "cancel_url": cancel_url
-                    }
-                }
-            }
+            }]
+        }
+
+        # Si on n'est pas dans un flux JS SDK (qui gère ses propres sources), on force PayPal
+        # Pour le JS SDK, on omet payment_source pour laisser le choix (Card, PayPal, Bancontact, Apple Pay...)
+        # Ici on garde le comportement par défaut (redirect) sauf si return_url est vide/spécial?
+        # Mieux: on ajoute un paramètre à la fonction. 
+        # Mais pour minimiser l'impact, on va assumer que si return_url contient "payment/complete" (notre nouvelle page),
+        # On peut toujours fournir l'experience_context mais sans forcer "paypal"? 
+        # API v2: "payment_source" is optional.
+        
+        # Pour supporter Bancontact/Apple Pay via Smart Buttons, il ne faut PAS restreindre à "paypal".
+        # On va inclure payment_source SEULEMENT si on veut forcer le redirect PayPal classique.
+        # Mais nous migrons vers Smart Buttons.
+        # On va créer un payload "application_context" pour les URLs (legacy mais compatible) 
+        # OU utiliser payment_source.paypal.experience_context qui est la norme.
+        
+        # Si on utilise Smart Buttons, le frontend appelle createOrder.
+        # Le frontend peut passer les infos.
+        
+        # Pour simplicité : on ajoute l'experience_context au niveau racine (application_context) pour compatibilité,
+        # ou dans payment_source.paypal si on veut redirect.
+        
+        # CHANGEMENT: On met les URLs dans application_context (niveau racine) 
+        # et on enlève payment_source pour laisser le choix.
+        order_data["application_context"] = {
+            "brand_name": "BABA Events",
+            "locale": locale,
+            "landing_page": "NO_PREFERENCE",
+            "user_action": "PAY_NOW",
+            "return_url": return_url,
+            "cancel_url": cancel_url,
+            "shipping_preference": "NO_SHIPPING"
         }
 
         logger.info(f"Création commande PayPal: {amount_str} EUR - {description[:50]}")
@@ -225,9 +244,12 @@ class PayPalPaymentClient:
             # Trouver l'URL d'approbation
             approve_url = None
             for link in result.get("links", []):
-                if link.get("rel") == "payer-action":
+                rel = link.get("rel")
+                if rel == "payer-action" or rel == "approve":
                     approve_url = link.get("href")
-                    break
+                    # On privilégie payer-action si présent (mais peu probable si on a les deux sans payment_source)
+                    if rel == "payer-action":
+                        break
             
             logger.info(f"Commande PayPal créée: {result.get('id')} - Status: {result.get('status')}")
 

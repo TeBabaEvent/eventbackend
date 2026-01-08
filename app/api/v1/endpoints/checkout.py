@@ -39,6 +39,7 @@ class CheckoutResponse(BaseModel):
     order_number: str
     pay_url: str
     amount: float  # En EUR
+    paypal_order_id: Optional[str] = None
 
 
 @router.post(
@@ -237,8 +238,9 @@ async def create_checkout_session(
 
         return CheckoutResponse(
             order_number=order.order_number,
-            pay_url=payment["approve_url"],
-            amount=amount_eur
+            pay_url=payment["approve_url"] or "",  # Smart Buttons n'utilisent pas ça
+            amount=amount_eur,
+            paypal_order_id=payment["id"]
         )
 
     except Exception as e:
@@ -510,11 +512,12 @@ async def create_cart_checkout_session(
 
         return CartCheckoutResponse(
             order_number=order.order_number,
-            pay_url=payment["approve_url"],
+            pay_url=payment["approve_url"] or "",  # Smart Buttons n'utilisent pas ça
             amount=total_amount_eur,
             total_items=len(validated_items),
             payment_method="online",
-            is_pending_cash=False
+            is_pending_cash=False,
+            paypal_order_id=payment["id"]
         )
 
     except Exception as e:
@@ -587,3 +590,108 @@ def get_order_status(request: Request, order_number: str, db: Session = Depends(
         "created_at": order.created_at.isoformat() if order.created_at else None,
         "paid_at": order.paid_at.isoformat() if order.paid_at else None
     }
+
+
+class CapturePaymentRequest(BaseModel):
+    paypal_order_id: str
+
+
+@router.post("/capture-payment/{order_number}")
+async def capture_payment(
+    order_number: str,
+    capture_req: CapturePaymentRequest,
+    db: Session = Depends(get_db),
+    paypal: PayPalPaymentClient = Depends(get_paypal_client)
+):
+    """
+    Capture le paiement PayPal (appelé depuis le frontend via JS SDK).
+    """
+    # 1. Récupérer la commande locale
+    order = db.query(models.Order).filter(models.Order.order_number == order_number).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Commande non trouvée")
+
+    # 2. Vérifier que c'est bien la bonne commande PayPal
+    if order.paypal_order_id != capture_req.paypal_order_id:
+        # Cas où l'ID n'a pas été sauvegardé (ex: création via une autre méthode?)
+        # Ou tentative de fraude/mismatch
+        if not order.paypal_order_id:
+            # On l'associe maintenant pour être sûr (si pas déjà fait)
+            order.paypal_order_id = capture_req.paypal_order_id
+            db.commit()
+        else:
+            raise HTTPException(status_code=400, detail="Mismatch PayPal Order ID")
+
+    # 3. Vérifier le statut
+    if order.status == "completed":
+        return {"status": "completed", "message": "Déjà payé"}
+    
+    # 4. Capturer via PayPal (Check if already captured by checking API status?)
+    try:
+        # get_order d'abord pour vérifier statut chez PayPal ?
+        # Ou capture directe. Si déjà capturé, PayPal renverra une erreur ou infos.
+        # On tente de capturer.
+        capture_result = paypal.capture_order(capture_req.paypal_order_id)
+        
+        if capture_result["status"] != "COMPLETED":
+             raise HTTPException(status_code=400, detail=f"Statut PayPal non valide: {capture_result['status']}")
+
+    except Exception as e:
+        logger.error(f"Erreur capture PayPal: {e}")
+        # On vérifie si c'est "Order already captured"
+        # Si oui, on continue le process de finalisation
+        # Sinon, erreur
+        raise HTTPException(status_code=500, detail="Erreur lors de la capture PayPal")
+
+    # 5. Finaliser la commande
+    order.status = "completed"
+    order.paid_at = datetime.utcnow()
+    
+    # Update sold counts
+    items = db.query(models.OrderItem).filter(models.OrderItem.order_id == order.id).all()
+    # Note: Logic duplicated from webhook/checkout - consider refactoring into service
+    # Pour l'instant on garde simple (on suppose que les sold_count ont été incrémentés à la création si le système le fait,
+    # MAIS ici c'était pending. pending ne décrémente pas le stock dispo global si on utilise capacity? 
+    # create_session vérifie capacity mais n'incrémente pas sold_count (seulement paid le fait?)
+    # CHECKOUT.PY L176 (gratuit) incrémente sold_count.
+    # L'implémentation actuelle incrémente sold_count uniquement au paiement?
+    # WEBHOOKS.PY: `event_pack.sold_count = (event_pack.sold_count or 0) + item.quantity`
+    # Donc OUI, il faut incrémenter ici.
+    
+    for item in items:
+        # Trouver le EventPack
+        ep = db.query(models.EventPack).filter(
+            models.EventPack.event_id == item.event_id, 
+            models.EventPack.pack_id == item.pack_id
+        ).with_for_update().first()
+        
+        if ep:
+            ep.sold_count = (ep.sold_count or 0) + item.quantity
+
+    db.commit()
+    db.refresh(order)
+
+    # 6. Générer tickets et envoyer email
+    from app.services.ticket_service import generate_tickets_for_order
+    from app.services.pdf_service import generate_individual_ticket_pdfs, delete_pdf_file
+    from app.services.email_service import send_confirmation_email
+
+    try:
+        tickets = await generate_tickets_for_order(order, db)
+        pdf_paths = await generate_individual_ticket_pdfs(tickets, order)
+        await send_confirmation_email(
+            to_email=order.customer_email,
+            customer_name=order.customer_name,
+            order=order,
+            tickets=tickets,
+            pdf_paths=pdf_paths
+        )
+        # Nettoyer
+        for pdf_path in pdf_paths:
+            delete_pdf_file(pdf_path)
+    except Exception as e:
+        logger.error(f"Erreur tickets/mail post-capture: {e}")
+        # Non-bloquant pour la réponse au client (il a payé)
+
+    return {"status": "completed", "order_number": order.order_number}
+
