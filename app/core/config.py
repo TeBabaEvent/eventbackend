@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     secret_key: str
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 15  # ✅ Short-lived for security
-    refresh_token_expire_days: int = 7  # ✅ Refresh token lifetime
+    refresh_token_expire_days: int = 30  # ✅ Refresh token lifetime (30 days = ~1 month session)
 
     # Cookie Configuration - Cross-origin requires SameSite=none + Secure
     cookie_secure: bool = True  # ✅ Always True for HTTPS (required with SameSite=none)
