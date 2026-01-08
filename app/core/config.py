@@ -50,9 +50,11 @@ class Settings(BaseSettings):
     base_url: str = "https://eventbackend-production-039e.up.railway.app"
     frontend_url: str = "https://www.baba.events"
 
-    # Gmail SMTP
-    gmail_address: Optional[str] = None
-    gmail_app_password: Optional[str] = None
+    # SMTP Email Configuration (OVH, Gmail, ou autre)
+    smtp_host: str = "ssl0.ovh.net"  # OVH par défaut
+    smtp_port: int = 587  # Port STARTTLS
+    smtp_email: Optional[str] = None  # info@baba.events
+    smtp_password: Optional[str] = None
     email_from_name: str = "BABA Event"
 
     model_config = ConfigDict(

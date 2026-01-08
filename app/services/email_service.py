@@ -30,15 +30,15 @@ class EmailService:
     """Service pour l'envoi d'emails transactionnels"""
 
     def __init__(self):
-        """Initialise le service email avec la configuration Gmail"""
-        self.smtp_server = "smtp.gmail.com"
-        self.smtp_port = 587
-        self.email = settings.gmail_address or ""
-        self.password = settings.gmail_app_password or ""
+        """Initialise le service email avec la configuration SMTP (OVH, Gmail, etc.)"""
+        self.smtp_server = settings.smtp_host
+        self.smtp_port = settings.smtp_port
+        self.email = settings.smtp_email or ""
+        self.password = settings.smtp_password or ""
         self.from_name = settings.email_from_name
 
         if not self.email or not self.password:
-            logger.warning("Gmail SMTP non configuré dans .env")
+            logger.warning("SMTP non configuré - Vérifiez SMTP_EMAIL et SMTP_PASSWORD")
 
         # Configurer Jinja2 pour les templates
         try:
@@ -150,7 +150,7 @@ class EmailService:
             Exception: Si l'envoi échoue
         """
         if not self.email or not self.password:
-            raise ValueError("Gmail SMTP non configuré")
+            raise ValueError("SMTP non configuré")
 
         try:
             with smtplib.SMTP(self.smtp_server, self.smtp_port) as server:
@@ -161,7 +161,7 @@ class EmailService:
             logger.info(f"Email envoyé à {msg['To']}")
 
         except smtplib.SMTPAuthenticationError:
-            logger.error("Erreur d'authentification Gmail - Vérifiez GMAIL_APP_PASSWORD")
+            logger.error("Erreur d'authentification SMTP - Vérifiez SMTP_EMAIL et SMTP_PASSWORD")
             raise
         except Exception as e:
             logger.error(f"Erreur envoi email: {e}")
