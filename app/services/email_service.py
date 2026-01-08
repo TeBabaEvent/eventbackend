@@ -390,7 +390,7 @@ class EmailService:
         to_email: str,
         customer_name: str,
         order: Order,
-        pdf_path: str
+        pdf_paths: List[str]
     ):
         """
         Envoie un email de rappel J-1.
@@ -399,9 +399,9 @@ class EmailService:
             to_email: Email du client
             customer_name: Nom du client
             order: Commande associée
-            pdf_path: Chemin vers le PDF des billets
+            pdf_paths: Liste des chemins vers les PDFs des billets
         """
-        logger.info(f"Envoi email rappel à {to_email}")
+        logger.info(f"Envoi email rappel à {to_email} avec {len(pdf_paths)} billets")
 
         html = f"""
 <!DOCTYPE html>
@@ -456,11 +456,17 @@ class EmailService:
 </html>
         """
 
+        # Préparer les pièces jointes (un PDF par billet)
+        attachments = []
+        for pdf_path in pdf_paths:
+            filename = os.path.basename(pdf_path)
+            attachments.append((pdf_path, filename))
+
         msg = self._create_message(
             to_email=to_email,
             subject=f"Rappel : {order.event.title} demain !",
             html_content=html,
-            attachments=[(pdf_path, f"billets-{order.order_number}.pdf")]
+            attachments=attachments
         )
 
         self._send(msg)
@@ -669,9 +675,9 @@ async def send_confirmation_email(to_email, customer_name, order, tickets, pdf_p
     await email_service.send_confirmation(to_email, customer_name, order, tickets, pdf_paths)
 
 
-async def send_reminder_email(to_email, customer_name, order, pdf_path):
-    """Helper pour background tasks"""
-    await email_service.send_reminder(to_email, customer_name, order, pdf_path)
+async def send_reminder_email(to_email, customer_name, order, pdf_paths):
+    """Helper pour background tasks - pdf_paths est une liste de chemins"""
+    await email_service.send_reminder(to_email, customer_name, order, pdf_paths)
 
 
 async def send_refund_email(to_email, customer_name, order, amount):
