@@ -167,23 +167,23 @@ class EmailService:
         customer_name: str,
         order: Order,
         tickets: List[Ticket],
-        pdf_path: str
+        pdf_paths: List[str]
     ):
         """
-        Envoie l'email de confirmation avec les billets.
-        Supporte les commandes single-pack (legacy) et multi-pack.
+        Envoie l'email de confirmation avec les billets individuels.
+        Chaque billet est envoyé dans un PDF séparé.
 
         Args:
             to_email: Email du client
             customer_name: Nom du client
             order: Commande associée
             tickets: Liste des tickets générés
-            pdf_path: Chemin vers le PDF des billets
+            pdf_paths: Liste des chemins vers les PDFs individuels
 
         Raises:
             Exception: Si l'envoi échoue
         """
-        logger.info(f"Envoi email confirmation à {to_email}")
+        logger.info(f"Envoi email confirmation à {to_email} avec {len(pdf_paths)} billets")
 
         # Utiliser les propriétés helper du modèle Order
         pack_items = order.pack_items_list
@@ -230,12 +230,19 @@ class EmailService:
             img_bytes, content_type, _ = logo_data
             embedded_images.append((img_bytes, "logo", content_type))
 
+        # Préparer les pièces jointes (un PDF par billet)
+        attachments = []
+        for i, pdf_path in enumerate(pdf_paths, start=1):
+            # Extraire le code du ticket du nom de fichier pour un nom clair
+            filename = os.path.basename(pdf_path)
+            attachments.append((pdf_path, filename))
+
         # Créer et envoyer le message
         msg = self._create_message(
             to_email=to_email,
             subject=f"Vos billets pour {order.event.title}",
             html_content=html,
-            attachments=[(pdf_path, f"billets-{order.order_number}.pdf")],
+            attachments=attachments,
             embedded_images=embedded_images if embedded_images else None
         )
 
@@ -657,9 +664,9 @@ email_service = EmailService()
 
 
 # Fonctions helper pour les background tasks
-async def send_confirmation_email(to_email, customer_name, order, tickets, pdf_path):
-    """Helper pour background tasks"""
-    await email_service.send_confirmation(to_email, customer_name, order, tickets, pdf_path)
+async def send_confirmation_email(to_email, customer_name, order, tickets, pdf_paths):
+    """Helper pour background tasks - pdf_paths est maintenant une liste de chemins"""
+    await email_service.send_confirmation(to_email, customer_name, order, tickets, pdf_paths)
 
 
 async def send_reminder_email(to_email, customer_name, order, pdf_path):

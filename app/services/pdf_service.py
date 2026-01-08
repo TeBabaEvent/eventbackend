@@ -160,6 +160,8 @@ async def generate_tickets_pdf(tickets: List[Ticket], order: Order) -> str:
     """
     Generate a premium PDF with order confirmation and tickets.
     Uses WeasyPrint with HTML/CSS templates for beautiful output.
+    
+    DEPRECATED: Use generate_individual_ticket_pdfs for individual ticket PDFs.
     """
     if not tickets:
         raise ValueError("No tickets provided")
@@ -221,6 +223,93 @@ async def generate_tickets_pdf(tickets: List[Ticket], order: Order) -> str:
     
     logger.info(f"PDF generated successfully: {filepath}")
     return filepath
+
+
+async def generate_single_ticket_pdf(ticket: Ticket, order: Order, ticket_index: int, total_tickets: int) -> str:
+    """
+    Generate a professional single-page PDF for one ticket with a large centered QR code.
+    
+    Args:
+        ticket: The ticket to generate PDF for
+        order: The order containing the ticket
+        ticket_index: 1-based index of this ticket (e.g., 1 of 3)
+        total_tickets: Total number of tickets in the order
+    
+    Returns:
+        str: Path to the generated PDF file
+    """
+    # Ensure output directory exists
+    os.makedirs(PDF_OUTPUT_DIR, exist_ok=True)
+    
+    filename = f"billet-{ticket.ticket_code}.pdf"
+    filepath = os.path.join(PDF_OUTPUT_DIR, filename)
+    
+    logger.info(f"Generating single ticket PDF: {filename}")
+    
+    # Prepare template data
+    event = order.event
+    full_date = _format_date_full(event.date)
+    location = f"{event.location}, {event.city}" if event.city else event.location
+    
+    # Generate QR code for this ticket
+    ticket_data = {
+        'ticket_code': ticket.ticket_code,
+        'holder_name': ticket.holder_name,
+        'pack_name': ticket.pack_name,
+        'qr_base64': _generate_qr_base64(ticket.qr_data)
+    }
+    
+    # Get logo as base64
+    logo_base64 = _get_logo_base64()
+    
+    # Render template
+    template = jinja_env.get_template('single_ticket.html')
+    html_content = template.render(
+        ticket=ticket_data,
+        order=order,
+        event=event,
+        full_date=full_date,
+        location=location,
+        logo_base64=logo_base64,
+        ticket_index=ticket_index,
+        total_tickets=total_tickets,
+        current_year=datetime.now().year
+    )
+    
+    # Generate PDF in thread pool (WeasyPrint is sync)
+    loop = asyncio.get_event_loop()
+    await loop.run_in_executor(_executor, _render_pdf_sync, html_content, filepath)
+    
+    logger.info(f"Single ticket PDF generated: {filepath}")
+    return filepath
+
+
+async def generate_individual_ticket_pdfs(tickets: List[Ticket], order: Order) -> List[str]:
+    """
+    Generate individual PDFs for each ticket in an order.
+    Each PDF contains one ticket with a large, centered QR code.
+    
+    Args:
+        tickets: List of tickets to generate PDFs for
+        order: The order containing the tickets
+    
+    Returns:
+        List[str]: List of paths to the generated PDF files
+    """
+    if not tickets:
+        raise ValueError("No tickets provided")
+    
+    logger.info(f"Generating {len(tickets)} individual ticket PDFs for order {order.order_number}")
+    
+    pdf_paths = []
+    total_tickets = len(tickets)
+    
+    for index, ticket in enumerate(tickets, start=1):
+        pdf_path = await generate_single_ticket_pdf(ticket, order, index, total_tickets)
+        pdf_paths.append(pdf_path)
+    
+    logger.info(f"Generated {len(pdf_paths)} individual ticket PDFs for order {order.order_number}")
+    return pdf_paths
 
 
 # ============================================

@@ -21,7 +21,7 @@ async def recover_missing_tickets():
         dict: Statistiques de récupération
     """
     from app.services.ticket_service import generate_tickets_for_order
-    from app.services.pdf_service import generate_tickets_pdf, delete_pdf_file
+    from app.services.pdf_service import generate_individual_ticket_pdfs, delete_pdf_file
     from app.services.email_service import send_confirmation_email
     
     db = SessionLocal()
@@ -54,15 +54,16 @@ async def recover_missing_tickets():
                 order.tickets_generated = True
                 db.commit()
                 
-                # 3. Générer le PDF
+                # 3. Générer les PDFs individuels
+                pdf_paths = []
                 try:
-                    pdf_path = await generate_tickets_pdf(tickets, order)
+                    pdf_paths = await generate_individual_ticket_pdfs(tickets, order)
                 except Exception as e:
-                    logger.error(f"Erreur PDF pour {order.order_number}: {e}")
-                    pdf_path = None
+                    logger.error(f"Erreur PDFs pour {order.order_number}: {e}")
+                    pdf_paths = []
                 
                 # 4. Envoyer l'email
-                if pdf_path:
+                if pdf_paths:
                     email_sent = False
                     try:
                         await send_confirmation_email(
@@ -70,16 +71,17 @@ async def recover_missing_tickets():
                             customer_name=order.customer_name,
                             order=order,
                             tickets=tickets,
-                            pdf_path=pdf_path
+                            pdf_paths=pdf_paths
                         )
                         logger.info(f"✓ {order.order_number} récupéré avec succès")
                         email_sent = True
                     except Exception as e:
                         logger.error(f"Erreur email pour {order.order_number}: {e}")
 
-                    # 5. Nettoyer le PDF après envoi réussi
+                    # 5. Nettoyer les PDFs après envoi réussi
                     if email_sent:
-                        delete_pdf_file(pdf_path)
+                        for pdf_path in pdf_paths:
+                            delete_pdf_file(pdf_path)
 
                 recovered += 1
                 

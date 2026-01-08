@@ -210,14 +210,14 @@ async def process_successful_payment(order_id: str):
     2. Vérifier si les tickets n'ont pas déjà été générés
     3. Générer les tickets avec QR codes JWT
     4. Marquer tickets_generated = True
-    5. Générer le PDF des tickets
-    6. Envoyer l'email de confirmation
+    5. Générer un PDF individuel par ticket (avec QR code grand et centré)
+    6. Envoyer l'email de confirmation avec tous les PDFs en pièces jointes
 
     Args:
         order_id: ID de la commande à traiter
     """
     from app.db.database import SessionLocal
-    from app.services.pdf_service import generate_tickets_pdf, delete_pdf_file
+    from app.services.pdf_service import generate_individual_ticket_pdfs, delete_pdf_file
     from app.services.email_service import send_confirmation_email
 
     db = SessionLocal()
@@ -248,17 +248,18 @@ async def process_successful_payment(order_id: str):
         order.tickets_generated = True
         db.commit()
 
-        # 3. Générer le PDF
+        # 3. Générer un PDF individuel par ticket
+        pdf_paths = []
         try:
-            pdf_path = await generate_tickets_pdf(tickets, order)
-            logger.info(f"PDF généré: {pdf_path}")
+            pdf_paths = await generate_individual_ticket_pdfs(tickets, order)
+            logger.info(f"{len(pdf_paths)} PDFs individuels générés pour commande {order.order_number}")
         except Exception as e:
-            logger.error(f"Erreur génération PDF: {e}")
-            # Continuer même si le PDF échoue
-            pdf_path = None
+            logger.error(f"Erreur génération PDFs: {e}")
+            # Continuer même si les PDFs échouent
+            pdf_paths = []
 
-        # 4. Envoyer l'email de confirmation
-        if pdf_path:
+        # 4. Envoyer l'email de confirmation avec tous les PDFs
+        if pdf_paths:
             email_sent = False
             try:
                 await send_confirmation_email(
@@ -266,19 +267,20 @@ async def process_successful_payment(order_id: str):
                     customer_name=order.customer_name,
                     order=order,
                     tickets=tickets,
-                    pdf_path=pdf_path
+                    pdf_paths=pdf_paths
                 )
-                logger.info(f"Email de confirmation envoyé à {order.customer_email}")
+                logger.info(f"Email de confirmation envoyé à {order.customer_email} avec {len(pdf_paths)} billets")
                 email_sent = True
             except Exception as e:
                 logger.error(f"Erreur envoi email: {e}")
                 # Ne pas faire échouer le traitement si email échoue
 
-            # 5. Nettoyer le PDF après envoi réussi
+            # 5. Nettoyer tous les PDFs après envoi réussi
             if email_sent:
-                delete_pdf_file(pdf_path)
+                for pdf_path in pdf_paths:
+                    delete_pdf_file(pdf_path)
         else:
-            logger.warning(f"Pas de PDF - email non envoyé pour {order.order_number}")
+            logger.warning(f"Pas de PDFs - email non envoyé pour {order.order_number}")
 
         logger.info(f"Traitement post-paiement terminé pour {order.order_number}")
 

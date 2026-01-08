@@ -17,7 +17,7 @@ from app.api.deps import (
 from app.core.rate_limiter import limiter, RATE_LIMITS
 from app.services.mollie_client import MolliePaymentClient
 from app.services.email_service import send_confirmation_email
-from app.services.pdf_service import generate_tickets_pdf, delete_pdf_file
+from app.services.pdf_service import generate_individual_ticket_pdfs, delete_pdf_file
 from app.services.ticket_service import generate_tickets_for_order
 from app.services.admin_order_service import AdminOrderService
 from app.services.admin_user_service import AdminUserService
@@ -268,9 +268,9 @@ async def resend_confirmation_email(
         )
 
     try:
-        # 3. Régénérer le PDF
-        pdf_path = await generate_tickets_pdf(tickets, order)
-        logger.info(f"PDF régénéré: {pdf_path}")
+        # 3. Régénérer les PDFs individuels
+        pdf_paths = await generate_individual_ticket_pdfs(tickets, order)
+        logger.info(f"{len(pdf_paths)} PDFs régénérés pour {order.order_number}")
 
         # 4. Envoyer l'email
         await send_confirmation_email(
@@ -278,13 +278,14 @@ async def resend_confirmation_email(
             customer_name=order.customer_name,
             order=order,
             tickets=tickets,
-            pdf_path=pdf_path
+            pdf_paths=pdf_paths
         )
 
-        logger.info(f"Email renvoyé à {order.customer_email}")
+        logger.info(f"Email renvoyé à {order.customer_email} avec {len(pdf_paths)} billets")
 
-        # 5. Nettoyer le PDF après envoi réussi
-        delete_pdf_file(pdf_path)
+        # 5. Nettoyer les PDFs après envoi réussi
+        for pdf_path in pdf_paths:
+            delete_pdf_file(pdf_path)
 
         return ResendEmailResponse(
             success=True,

@@ -186,22 +186,23 @@ def create_checkout_session(
 
         # Générer les tickets immédiatement
         from app.services.ticket_service import generate_tickets_for_order
-        from app.services.pdf_service import generate_tickets_pdf, delete_pdf_file
+        from app.services.pdf_service import generate_individual_ticket_pdfs, delete_pdf_file
         from app.services.email_service import send_confirmation_email
 
         try:
-            tickets = generate_tickets_for_order(order, db)
-            pdf_path = generate_tickets_pdf(tickets, order, event)
-            send_confirmation_email(
+            tickets = await generate_tickets_for_order(order, db)
+            pdf_paths = await generate_individual_ticket_pdfs(tickets, order)
+            await send_confirmation_email(
                 to_email=order.customer_email,
                 customer_name=order.customer_name,
                 order=order,
                 tickets=tickets,
-                pdf_path=pdf_path
+                pdf_paths=pdf_paths
             )
             logger.info(f"Tickets gratuits générés et envoyés pour commande {order_number}")
-            # Nettoyer le PDF après envoi réussi
-            delete_pdf_file(pdf_path)
+            # Nettoyer les PDFs après envoi réussi
+            for pdf_path in pdf_paths:
+                delete_pdf_file(pdf_path)
         except Exception as e:
             logger.error(f"Erreur génération tickets gratuits: {e}")
             # Ne pas échouer la commande, les tickets peuvent être régénérés
@@ -427,23 +428,23 @@ def create_cart_checkout_session(
 
         # Générer les tickets immédiatement
         from app.services.ticket_service import generate_tickets_for_order
-        from app.services.pdf_service import generate_tickets_pdf, delete_pdf_file
+        from app.services.pdf_service import generate_individual_ticket_pdfs, delete_pdf_file
         from app.services.email_service import send_confirmation_email
 
         try:
-            event = db.query(models.Event).filter(models.Event.id == event_id).first()
-            tickets = generate_tickets_for_order(order, db)
-            pdf_path = generate_tickets_pdf(tickets, order, event)
-            send_confirmation_email(
+            tickets = await generate_tickets_for_order(order, db)
+            pdf_paths = await generate_individual_ticket_pdfs(tickets, order)
+            await send_confirmation_email(
                 to_email=order.customer_email,
                 customer_name=order.customer_name,
                 order=order,
                 tickets=tickets,
-                pdf_path=pdf_path
+                pdf_paths=pdf_paths
             )
             logger.info(f"Tickets gratuits (panier) générés et envoyés pour commande {order_number}")
-            # Nettoyer le PDF après envoi réussi
-            delete_pdf_file(pdf_path)
+            # Nettoyer les PDFs après envoi réussi
+            for pdf_path in pdf_paths:
+                delete_pdf_file(pdf_path)
         except Exception as e:
             logger.error(f"Erreur génération tickets gratuits (panier): {e}")
             # Ne pas échouer la commande, les tickets peuvent être régénérés

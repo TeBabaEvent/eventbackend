@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Billet - {{ ticket.ticket_code }}</title>
+    <style>
+        /* ============================================
+           BABA EVENT - Single Ticket PDF
+           Professional Design with Large QR Code
+           ============================================ */
+        
+        @page {
+            size: A4;
+            margin: 0;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Liberation Sans', 'DejaVu Sans', 'Segoe UI', Arial, sans-serif;
+            font-size: 11pt;
+            line-height: 1.5;
+            color: #1a1a1a;
+            background: #ffffff;
+        }
+        
+        /* ============================================
+           PAGE STRUCTURE
+           ============================================ */
+        
+        .page {
+            width: 210mm;
+            height: 297mm;
+            background: #ffffff;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        /* ============================================
+           HEADER - Dark Branded
+           ============================================ */
+        
+        .header {
+            background: linear-gradient(135deg, #0a0a0f 0%, #1a1a20 100%);
+            padding: 28px 40px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 3px solid #dc143c;
+        }
+        
+        .logo {
+            height: 60px;
+            width: auto;
+        }
+        
+        .header-right {
+            text-align: right;
+        }
+        
+        .header-label {
+            font-size: 9pt;
+            color: #808080;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 6px;
+        }
+        
+        .ticket-number {
+            font-size: 12pt;
+            color: #ffffff;
+            font-family: 'Liberation Mono', 'DejaVu Sans Mono', monospace;
+            font-weight: 700;
+            letter-spacing: 1px;
+        }
+        
+        /* ============================================
+           MAIN CONTENT
+           ============================================ */
+        
+        .content {
+            flex: 1;
+            padding: 40px 50px;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        /* ============================================
+           EVENT INFO SECTION
+           ============================================ */
+        
+        .event-section {
+            text-align: center;
+            padding-bottom: 35px;
+            border-bottom: 1px solid #e5e7eb;
+            margin-bottom: 35px;
+        }
+        
+        .event-title {
+            font-size: 32pt;
+            font-weight: 800;
+            color: #0f0f0f;
+            margin-bottom: 20px;
+            line-height: 1.15;
+            letter-spacing: -0.5px;
+        }
+        
+        .event-meta {
+            display: flex;
+            justify-content: center;
+            gap: 50px;
+            margin-top: 20px;
+        }
+        
+        .meta-item {
+            text-align: center;
+        }
+        
+        .meta-label {
+            font-size: 9pt;
+            color: #9ca3af;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            margin-bottom: 6px;
+        }
+        
+        .meta-value {
+            font-size: 13pt;
+            font-weight: 600;
+            color: #1f2937;
+        }
+        
+        /* ============================================
+           QR CODE SECTION - CENTERED & LARGE
+           ============================================ */
+        
+        .qr-section {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 30px 0;
+        }
+        
+        .qr-container {
+            background: #fafafa;
+            border: 2px solid #e5e7eb;
+            border-radius: 20px;
+            padding: 35px;
+            text-align: center;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+        }
+        
+        .qr-wrapper {
+            background: #ffffff;
+            padding: 20px;
+            border-radius: 16px;
+            border: 1px solid #e5e7eb;
+            display: inline-block;
+            margin-bottom: 25px;
+        }
+        
+        .qr-image {
+            width: 220px;
+            height: 220px;
+            display: block;
+        }
+        
+        .scan-label {
+            font-size: 13pt;
+            color: #4b5563;
+            margin-bottom: 12px;
+            font-weight: 500;
+        }
+        
+        .ticket-code {
+            font-family: 'Liberation Mono', 'DejaVu Sans Mono', monospace;
+            font-size: 14pt;
+            font-weight: 700;
+            color: #111827;
+            letter-spacing: 1px;
+            background: #f3f4f6;
+            padding: 12px 24px;
+            border-radius: 8px;
+            display: inline-block;
+        }
+        
+        /* ============================================
+           TICKET DETAILS
+           ============================================ */
+        
+        .details-section {
+            display: flex;
+            justify-content: center;
+            gap: 60px;
+            padding: 30px 0;
+            border-top: 1px solid #e5e7eb;
+            margin-top: auto;
+        }
+        
+        .detail-box {
+            text-align: center;
+            min-width: 120px;
+        }
+        
+        .detail-label {
+            font-size: 9pt;
+            color: #9ca3af;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 6px;
+        }
+        
+        .detail-value {
+            font-size: 12pt;
+            font-weight: 600;
+            color: #1f2937;
+        }
+        
+        .pack-badge {
+            display: inline-block;
+            background: #fef2f2;
+            color: #dc143c;
+            font-size: 11pt;
+            font-weight: 700;
+            padding: 8px 20px;
+            border-radius: 8px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        /* ============================================
+           FOOTER
+           ============================================ */
+        
+        .footer {
+            background: #f9fafb;
+            border-top: 1px solid #e5e7eb;
+            padding: 20px 40px;
+        }
+        
+        .footer-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .footer-left {
+            font-size: 9pt;
+            color: #9ca3af;
+        }
+        
+        .footer-center {
+            text-align: center;
+        }
+        
+        .footer-notice {
+            font-size: 9pt;
+            color: #6b7280;
+            font-weight: 500;
+        }
+        
+        .footer-right {
+            font-size: 9pt;
+            color: #6b7280;
+            font-weight: 500;
+        }
+        
+        /* ============================================
+           INFO BOX
+           ============================================ */
+        
+        .info-box {
+            background: #f0fdf4;
+            border: 1px solid #bbf7d0;
+            border-left: 4px solid #22c55e;
+            border-radius: 10px;
+            padding: 18px 24px;
+            margin-top: 25px;
+            text-align: center;
+        }
+        
+        .info-text {
+            color: #166534;
+            font-size: 11pt;
+            line-height: 1.5;
+        }
+        
+        .info-text strong {
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <div class="page">
+        <!-- HEADER -->
+        <header class="header">
+            {% if logo_base64 %}
+            <img class="logo" src="data:image/png;base64,{{ logo_base64 }}" alt="BABA Event">
+            {% else %}
+            <div style="font-size: 22pt; font-weight: 800; letter-spacing: 3px;">
+                <span style="color: #ffffff;">BABA</span>
+                <span style="color: #dc143c;">EVENT</span>
+            </div>
+            {% endif %}
+            <div class="header-right">
+                <div class="header-label">Billet électronique</div>
+                <div class="ticket-number">{{ ticket.ticket_code }}</div>
+            </div>
+        </header>
+        
+        <!-- MAIN CONTENT -->
+        <div class="content">
+            <!-- EVENT INFO -->
+            <section class="event-section">
+                <h1 class="event-title">{{ event.title }}</h1>
+                
+                <div class="event-meta">
+                    <div class="meta-item">
+                        <div class="meta-label">Date</div>
+                        <div class="meta-value">{{ full_date }}</div>
+                    </div>
+                    <div class="meta-item">
+                        <div class="meta-label">Heure</div>
+                        <div class="meta-value">{{ event.time }}</div>
+                    </div>
+                    <div class="meta-item">
+                        <div class="meta-label">Lieu</div>
+                        <div class="meta-value">{{ location }}</div>
+                    </div>
+                </div>
+            </section>
+            
+            <!-- QR CODE - LARGE & CENTERED -->
+            <section class="qr-section">
+                <div class="qr-container">
+                    <div class="qr-wrapper">
+                        <img class="qr-image" src="data:image/png;base64,{{ ticket.qr_base64 }}" alt="QR Code">
+                    </div>
+                    <div class="scan-label">Présentez ce QR code à l'entrée</div>
+                    <div class="ticket-code">{{ ticket.ticket_code }}</div>
+                </div>
+                
+                <div class="info-box">
+                    <div class="info-text">
+                        <strong>Important :</strong> Ce billet est personnel et ne peut être utilisé qu'une seule fois.
+                    </div>
+                </div>
+            </section>
+            
+            <!-- TICKET DETAILS -->
+            <section class="details-section">
+                <div class="detail-box">
+                    <div class="detail-label">Titulaire</div>
+                    <div class="detail-value">{{ ticket.holder_name or order.customer_name }}</div>
+                </div>
+                <div class="detail-box">
+                    <div class="detail-label">Type de billet</div>
+                    <div class="pack-badge">{{ ticket.pack_name or 'Standard' }}</div>
+                </div>
+                <div class="detail-box">
+                    <div class="detail-label">Commande</div>
+                    <div class="detail-value">#{{ order.order_number }}</div>
+                </div>
+            </section>
+        </div>
+        
+        <!-- FOOTER -->
+        <footer class="footer">
+            <div class="footer-content">
+                <div class="footer-left">© {{ current_year }} BABA Event • www.baba.events</div>
+                <div class="footer-center">
+                    <span class="footer-notice">Billet {{ ticket_index }} sur {{ total_tickets }}</span>
+                </div>
+                <div class="footer-right">Commande {{ order.order_number }}</div>
+            </div>
+        </footer>
+    </div>
+</body>
+</html>
+
