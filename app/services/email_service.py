@@ -1,4 +1,4 @@
-"""Service d'envoi d'emails via Gmail SMTP"""
+"""Service d'envoi d'emails via SMTP (OVH, Gmail, etc.)"""
 import smtplib
 import os
 import asyncio
@@ -140,7 +140,8 @@ class EmailService:
 
     def _send_sync(self, msg: MIMEMultipart):
         """
-        Envoie un message via SMTP Gmail (opération synchrone).
+        Envoie un message via SMTP (opération synchrone).
+        Supporte SSL (port 465) et STARTTLS (port 587).
         Appelée dans un thread pool pour ne pas bloquer l'event loop.
 
         Args:
@@ -153,10 +154,16 @@ class EmailService:
             raise ValueError("SMTP non configuré")
 
         try:
-            with smtplib.SMTP(self.smtp_server, self.smtp_port) as server:
-                server.starttls()
-                server.login(self.email, self.password)
-                server.send_message(msg)
+            # Port 465 = SSL direct, Port 587 = STARTTLS
+            if self.smtp_port == 465:
+                with smtplib.SMTP_SSL(self.smtp_server, self.smtp_port, timeout=30) as server:
+                    server.login(self.email, self.password)
+                    server.send_message(msg)
+            else:
+                with smtplib.SMTP(self.smtp_server, self.smtp_port, timeout=30) as server:
+                    server.starttls()
+                    server.login(self.email, self.password)
+                    server.send_message(msg)
 
             logger.info(f"Email envoyé à {msg['To']}")
 
@@ -169,7 +176,7 @@ class EmailService:
 
     async def _send(self, msg: MIMEMultipart):
         """
-        Envoie un message via SMTP Gmail de manière asynchrone.
+        Envoie un message via SMTP de manière asynchrone.
         Utilise un thread pool pour ne pas bloquer l'event loop.
 
         Args:

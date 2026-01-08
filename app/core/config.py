@@ -52,7 +52,7 @@ class Settings(BaseSettings):
 
     # SMTP Email Configuration (OVH, Gmail, ou autre)
     smtp_host: str = "ssl0.ovh.net"  # OVH par défaut
-    smtp_port: int = 587  # Port STARTTLS
+    smtp_port: int = 465  # Port SSL (465) - Railway bloque souvent le port 587
     smtp_email: Optional[str] = None  # info@baba.events
     smtp_password: Optional[str] = None
     email_from_name: str = "BABA Event"
