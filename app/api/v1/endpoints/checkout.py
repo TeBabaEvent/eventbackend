@@ -53,7 +53,7 @@ class CheckoutResponse(BaseModel):
     }
 )
 @limiter.limit(RATE_LIMITS["checkout"])  # 10 checkout attempts per minute
-def create_checkout_session(
+async def create_checkout_session(
     request: Request,  # Required for rate limiting (must be named 'request' for slowapi)
     checkout_request: CheckoutRequest,
     db: Session = Depends(get_db),
@@ -272,7 +272,7 @@ def create_checkout_session(
     }
 )
 @limiter.limit(RATE_LIMITS["checkout"])  # 10 checkout attempts per minute
-def create_cart_checkout_session(
+async def create_cart_checkout_session(
     request: Request,  # Required for rate limiting (must be named 'request' for slowapi)
     cart_request: CartCheckoutRequest,
     db: Session = Depends(get_db),
