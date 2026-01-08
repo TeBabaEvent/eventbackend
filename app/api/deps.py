@@ -152,18 +152,6 @@ def get_paypal_client():
     from app.services.paypal_client import paypal_client
     return paypal_client
 
-
-# ============== MOLLIE CLIENT DEPENDENCY (Legacy) ==============
-
-def get_mollie_client():
-    """
-    Retourne le client Mollie.
-    DEPRECATED: Utiliser get_paypal_client() à la place.
-    """
-    from app.services.mollie_client import mollie_client
-    return mollie_client
-
-
 # ============== ADMIN SERVICE DEPENDENCIES ==============
 
 def get_admin_order_service(db: Session = Depends(get_db)):

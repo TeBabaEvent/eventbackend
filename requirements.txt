@@ -36,10 +36,10 @@ gunicorn==21.2.0
 # BILLETTERIE - New Dependencies
 # ============================================
 
-# PayPal Payments (remplace Mollie)
-# Utilise httpx directement pour l'API PayPal REST
+# PayPal Payments
+# Uses httpx directly for PayPal REST API
 
-# HTTP Client (utilisé par Mollie SDK et autres services)
+# HTTP Client (for PayPal API and other services)
 httpx==0.28.1
 
 # QR Codes & PDF Generation

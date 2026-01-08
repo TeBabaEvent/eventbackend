@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**Tebaba Backend** is a FastAPI-based event ticketing platform with payment processing (Mollie), PDF ticket generation, QR code validation, and email notifications. The application supports multi-language events and uses MySQL for persistence.
+**Tebaba Backend** is a FastAPI-based event ticketing platform with payment processing (PayPal, with legacy Mollie support), PDF ticket generation, QR code validation, and email notifications. The application supports multi-language events and uses MySQL for persistence.
 
 ## Development Commands
 
@@ -93,8 +93,8 @@ Set `AUTO_MIGRATE_ON_STARTUP=true` in `.env` (disabled by default for safety)
 - Full mode (development): can drop tables/columns
 - Use `check_schema_diff()` to preview changes before applying
 
-**Payment Processing** (`app/services/mollie_client.py`)
-- Mollie API integration for payments
+**Payment Processing** (`app/services/paypal_client.py`)
+- PayPal API integration for payments
 - Webhook handling with idempotency (`WebhookEvent` table)
 - Payment URLs configured via `BASE_URL` and `FRONTEND_URL`
 
@@ -129,7 +129,7 @@ Set `AUTO_MIGRATE_ON_STARTUP=true` in `.env` (disabled by default for safety)
 
 **Ticketing Workflow:**
 1. `Order` created (status: `pending`)
-2. Payment via Mollie
+2. Payment via PayPal (or legacy Mollie)
 3. Webhook confirms payment → Order status: `completed`
 4. Tickets generated → `Ticket` records created
 5. Tickets sent via email
@@ -147,7 +147,8 @@ Set `AUTO_MIGRATE_ON_STARTUP=true` in `.env` (disabled by default for safety)
 - `SECRET_KEY`: Must be ≥32 chars (validated)
 - `JWT_SECRET_KEY`: Separate key for QR codes
 - `DATABASE_URL`: Full DB URL (takes priority) or use individual `MYSQL_*` vars
-- `MOLLIE_API_KEY`: Payment provider key
+- `PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET`: PayPal API credentials
+- `PAYPAL_MODE`: `sandbox` or `live`
 - `CORS_ORIGINS`: Comma-separated allowed origins
 - `AUTO_MIGRATE_ON_STARTUP`: `true/false` (default: false)
 
@@ -290,7 +291,7 @@ app/
 │   ├── email_service.py
 │   ├── ticket_service.py
 │   ├── pdf_service.py
-│   ├── mollie_client.py
+│   ├── paypal_client.py       # Payment processor (PayPal)
 │   ├── scan_service.py
 │   ├── scheduler.py
 │   └── admin_*.py

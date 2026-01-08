@@ -124,7 +124,7 @@ class AdminOrderService:
             "amount": order.amount / 100,
             "status": order.status,
             "payment_method": getattr(order, 'payment_method', 'online') or 'online',
-            "mollie_payment_id": order.mollie_payment_id,
+            "paypal_order_id": order.paypal_order_id,
             "payment_failure_reason": getattr(order, 'payment_failure_reason', None),
             "created_at": order.created_at.isoformat() if order.created_at else None,
             "paid_at": order.paid_at.isoformat() if order.paid_at else None,
@@ -148,7 +148,7 @@ class AdminOrderService:
             "amount": order.amount / 100,
             "status": order.status,
             "payment_method": getattr(order, 'payment_method', 'online') or 'online',
-            "mollie_payment_id": order.mollie_payment_id,
+            "paypal_order_id": order.paypal_order_id,
             "created_at": order.created_at.isoformat() if order.created_at else None,
             "paid_at": order.paid_at.isoformat() if order.paid_at else None
         }

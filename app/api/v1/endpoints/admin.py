@@ -12,16 +12,17 @@ from app.api.deps import (
     require_admin,
     get_admin_order_service,
     get_admin_user_service,
-    get_mollie_client
+    get_paypal_client
 )
 from app.core.rate_limiter import limiter, RATE_LIMITS
-from app.services.mollie_client import MolliePaymentClient
+from app.services.paypal_client import PayPalPaymentClient
 from app.services.email_service import send_confirmation_email
 from app.services.pdf_service import generate_individual_ticket_pdfs, delete_pdf_file
 from app.services.ticket_service import generate_tickets_for_order
 from app.services.admin_order_service import AdminOrderService
 from app.services.admin_user_service import AdminUserService
 from app.services.order_formatting_service import format_pack_display, get_pack_items_for_display
+
 
 # Import schemas from dedicated file
 from app.schemas.admin import (
@@ -101,19 +102,20 @@ async def refund_order(
     request: RefundRequest,
     db: Session = Depends(get_db),
     admin: models.User = Depends(require_admin),
-    mollie_client: MolliePaymentClient = Depends(get_mollie_client)
+    paypal_client: PayPalPaymentClient = Depends(get_paypal_client)
 ):
     """
-    Rembourser une commande via Mollie.
+    Rembourser une commande via PayPal.
 
     Accessible aux admins et super_admins.
 
     Flow:
     1. Vérifier que la commande existe et est payée
-    2. Appeler l'API Mollie pour rembourser
-    3. Mettre à jour le statut de la commande
-    4. Annuler les tickets associés
-    5. Envoyer un email de confirmation
+    2. Récupérer le capture_id depuis PayPal
+    3. Appeler l'API PayPal pour rembourser
+    4. Mettre à jour le statut de la commande
+    5. Annuler les tickets associés
+    6. Envoyer un email de confirmation
 
     Args:
         order_id: ID de la commande
@@ -125,7 +127,7 @@ async def refund_order(
     Raises:
         HTTPException 404: Si la commande n'existe pas
         HTTPException 400: Si la commande ne peut pas être remboursée
-        HTTPException 500: Si l'API Mollie échoue
+        HTTPException 500: Si l'API PayPal échoue
     """
     logger.info(f"Admin {admin.username} demande remboursement commande {order_id}")
 
@@ -142,33 +144,53 @@ async def refund_order(
             detail=f"Cette commande ne peut pas être remboursée (statut: {order.status})"
         )
 
-    if not order.mollie_payment_id:
+    # Vérifier qu'on a une référence PayPal
+    if not order.paypal_order_id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Aucune référence de paiement Mollie trouvée pour cette commande"
+            detail="Aucune référence de paiement PayPal trouvée pour cette commande"
         )
 
     # Calculer le montant à rembourser
     refund_amount = request.amount if request.amount is not None else (order.amount / 100)
 
-    # 2. Appeler l'API Mollie pour rembourser
+    # 2. Récupérer le capture_id depuis PayPal
     try:
-        refund_result = mollie_client.create_refund(
-            payment_id=order.mollie_payment_id,
-            amount=refund_amount,
-            description=request.reason or f"Remboursement {order.order_number}"
+        order_details = paypal_client.get_order(order.paypal_order_id)
+        
+        # Extraire le capture_id
+        capture_id = None
+        purchase_units = order_details.get("purchase_units", [])
+        if purchase_units:
+            payments = purchase_units[0].get("payments", {})
+            captures = payments.get("captures", [])
+            if captures:
+                capture_id = captures[0].get("id")
+        
+        if not capture_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Impossible de trouver l'ID de capture PayPal pour cette commande"
+            )
+        
+        # 3. Appeler l'API PayPal pour rembourser
+        refund_result = paypal_client.create_refund(
+            capture_id=capture_id,
+            amount=refund_amount if request.amount is not None else None,  # None = remboursement total
+            note=request.reason or f"Remboursement {order.order_number}"
         )
+        logger.info(f"Remboursement PayPal réussi: {refund_result}")
 
-        logger.info(f"Remboursement Mollie réussi: {refund_result}")
-
+    except HTTPException:
+        raise  # Re-raise HTTP exceptions
     except Exception as e:
-        logger.error(f"Erreur remboursement Mollie: {e}")
+        logger.error(f"Erreur remboursement PayPal: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Erreur lors du remboursement Mollie: {str(e)}"
+            detail=f"Erreur lors du remboursement PayPal: {str(e)}"
         )
 
-    # 3. Mettre à jour le statut de la commande ET annuler les tickets en une transaction
+    # 4. Mettre à jour le statut de la commande ET annuler les tickets en une transaction
     try:
         order.status = "refunded"
         
@@ -177,13 +199,13 @@ async def refund_order(
             ticket.status = "cancelled"
         
         db.commit()
-        logger.info(f"Commande {order.order_number} remboursée ({refund_amount} EUR)")
+        logger.info(f"Commande {order.order_number} remboursée via PayPal ({refund_amount} EUR)")
     except Exception as e:
         db.rollback()
         logger.error(f"Erreur lors de la mise à jour de la commande: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Le remboursement Mollie a réussi mais la mise à jour en base a échoué"
+            detail="Le remboursement PayPal a réussi mais la mise à jour en base a échoué"
         )
 
     # 5. Envoyer un email de confirmation (en arrière-plan)
@@ -201,10 +223,12 @@ async def refund_order(
 
     return RefundResponse(
         success=True,
-        message=f"Remboursement de {refund_amount} EUR effectué avec succès",
+        message=f"Remboursement de {refund_amount} EUR effectué avec succès via PayPal",
         refund_amount=refund_amount,
         order_status="refunded"
     )
+
+
 
 
 @router.post(

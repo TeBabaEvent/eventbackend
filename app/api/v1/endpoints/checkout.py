@@ -130,7 +130,7 @@ async def create_checkout_session(
 
     # 5. Calculer le montant
     amount_cents = int(pack.price * checkout_request.quantity * 100)  # Stocker en centimes
-    amount_eur = amount_cents / 100  # Pour Mollie (EUR décimaux)
+    amount_eur = amount_cents / 100  # Pour PayPal (EUR décimaux)
 
     logger.info(f"Création commande: {checkout_request.quantity}x {pack.name} pour {event.title}")
 
@@ -207,7 +207,7 @@ async def create_checkout_session(
             logger.error(f"Erreur génération tickets gratuits: {e}")
             # Ne pas échouer la commande, les tickets peuvent être régénérés
 
-        # Retourner une réponse de succès SANS pay_url (pas de redirection Mollie)
+        # Retourner une réponse de succès SANS pay_url (pas de paiement nécessaire)
         return CheckoutResponse(
             order_number=order.order_number,
             pay_url=f"{settings.frontend_url}/payment/complete?order={order.order_number}",
@@ -474,7 +474,7 @@ async def create_cart_checkout_session(
             logger.error(f"Erreur génération tickets gratuits (panier): {e}")
             # Ne pas échouer la commande, les tickets peuvent être régénérés
 
-        # Retourner une réponse de succès SANS pay_url (pas de redirection Mollie)
+        # Retourner une réponse de succès SANS pay_url (pas de paiement nécessaire)
         return CartCheckoutResponse(
             order_number=order.order_number,
             pay_url=f"{settings.frontend_url}/payment/complete?order={order.order_number}",

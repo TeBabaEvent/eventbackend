@@ -24,7 +24,7 @@ class OrderListItem(BaseModel):
     amount: float
     status: str
     payment_method: str = "online"  # online, cash
-    mollie_payment_id: Optional[str]
+    paypal_order_id: Optional[str]
     created_at: str
     paid_at: Optional[str]
 
@@ -78,7 +78,7 @@ class OrderDetail(BaseModel):
     amount: float
     status: str
     payment_method: str = "online"  # online, cash
-    mollie_payment_id: Optional[str]
+    paypal_order_id: Optional[str]
     payment_failure_reason: Optional[str]
     created_at: str
     paid_at: Optional[str]

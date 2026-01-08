@@ -1,6 +1,5 @@
 """Client PayPal pour le système de billetterie BABA Event.
 
-Remplace le client Mollie.
 Documentation: https://developer.paypal.com/docs/api/orders/v2/
 
 Utilise httpx directement pour une compatibilité maximale.
