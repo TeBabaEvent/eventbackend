@@ -150,22 +150,43 @@ class EmailService:
         Raises:
             Exception: Si l'envoi échoue
         """
+        import time
+        
         if not self.email or not self.password:
             raise ValueError("SMTP non configuré")
 
         try:
+            start = time.time()
+            
             # Port 465 = SSL direct, Port 587 = STARTTLS
             if self.smtp_port == 465:
                 with smtplib.SMTP_SSL(self.smtp_server, self.smtp_port, timeout=30) as server:
+                    connect_time = time.time() - start
+                    logger.info(f"📧 SMTP connecté en {connect_time:.2f}s")
+                    
                     server.login(self.email, self.password)
+                    login_time = time.time() - start - connect_time
+                    logger.info(f"📧 SMTP login en {login_time:.2f}s")
+                    
                     server.send_message(msg)
+                    send_time = time.time() - start - connect_time - login_time
+                    logger.info(f"📧 Message envoyé en {send_time:.2f}s")
             else:
                 with smtplib.SMTP(self.smtp_server, self.smtp_port, timeout=30) as server:
+                    connect_time = time.time() - start
+                    logger.info(f"📧 SMTP connecté en {connect_time:.2f}s")
+                    
                     server.starttls()
                     server.login(self.email, self.password)
+                    login_time = time.time() - start - connect_time
+                    logger.info(f"📧 SMTP TLS+login en {login_time:.2f}s")
+                    
                     server.send_message(msg)
+                    send_time = time.time() - start - connect_time - login_time
+                    logger.info(f"📧 Message envoyé en {send_time:.2f}s")
 
-            logger.info(f"Email envoyé à {msg['To']}")
+            total_time = time.time() - start
+            logger.info(f"✅ Email envoyé à {msg['To']} (total: {total_time:.2f}s)")
 
         except smtplib.SMTPAuthenticationError:
             logger.error("Erreur d'authentification SMTP - Vérifiez SMTP_EMAIL et SMTP_PASSWORD")
