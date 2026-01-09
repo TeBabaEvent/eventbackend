@@ -38,6 +38,11 @@ def _get_weasyprint():
         # Configurer les chemins avant l'import
         _configure_library_paths()
         
+        # Réduire le bruit des logs fontTools AVANT l'import de WeasyPrint
+        for lib in ["fontTools", "fontTools.subset", "fontTools.ttLib", 
+                    "fontTools.subset.timer", "fontTools.ttLib.ttFont"]:
+            logging.getLogger(lib).setLevel(logging.ERROR)
+        
         try:
             from weasyprint import HTML
             _weasyprint_html = HTML
