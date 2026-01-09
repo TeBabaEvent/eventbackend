@@ -1,5 +1,5 @@
 """Fonctions de sécurité - JWT et hachage de mots de passe"""
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 from jose import JWTError, jwt
 import bcrypt
@@ -97,15 +97,15 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     """
     to_encode = data.copy()
     if expires_delta:
-        expire = datetime.utcnow() + expires_delta
+        expire = datetime.now(timezone.utc) + expires_delta
     else:
-        expire = datetime.utcnow() + timedelta(minutes=15)
+        expire = datetime.now(timezone.utc) + timedelta(minutes=15)
 
     # Add token type for validation
     to_encode.update({
         "exp": expire,
         "type": "access",
-        "iat": datetime.utcnow()
+        "iat": datetime.now(timezone.utc)
     })
 
     encoded_jwt = jwt.encode(to_encode, settings.secret_key, algorithm=settings.algorithm)
@@ -125,15 +125,15 @@ def create_refresh_token(data: dict, expires_delta: Optional[timedelta] = None) 
     """
     to_encode = data.copy()
     if expires_delta:
-        expire = datetime.utcnow() + expires_delta
+        expire = datetime.now(timezone.utc) + expires_delta
     else:
-        expire = datetime.utcnow() + timedelta(days=7)
+        expire = datetime.now(timezone.utc) + timedelta(days=7)
 
     # Add token type for validation
     to_encode.update({
         "exp": expire,
         "type": "refresh",
-        "iat": datetime.utcnow()
+        "iat": datetime.now(timezone.utc)
     })
 
     encoded_jwt = jwt.encode(to_encode, settings.secret_key, algorithm=settings.algorithm)

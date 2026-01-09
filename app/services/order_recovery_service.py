@@ -1,6 +1,6 @@
 """Service de récupération des commandes et nettoyage"""
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
 
@@ -113,7 +113,7 @@ async def cleanup_expired_orders():
     expired_count = 0
     
     try:
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         
         # Trouver les commandes pending expirées
         expired_orders = db.query(models.Order).filter(
@@ -166,7 +166,7 @@ async def get_recovery_stats():
         ).count()
         
         # Commandes pending potentiellement expirées
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         expired_pending = db.query(models.Order).filter(
             and_(
                 models.Order.status == "pending",

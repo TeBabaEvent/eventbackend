@@ -3,7 +3,7 @@ from fastapi import APIRouter, HTTPException, Depends, Query, Request, status
 from sqlalchemy.orm import Session
 from sqlalchemy import func, and_, or_
 from typing import Optional, List
-from datetime import datetime, date, timedelta
+from datetime import datetime, date, timedelta, timezone
 import logging
 
 from app.db.database import get_db
@@ -283,7 +283,7 @@ async def mark_cash_reservation_paid(
     try:
         # 2. Mettre à jour le statut
         order.status = "completed"
-        order.paid_at = datetime.utcnow()
+        order.paid_at = datetime.now(timezone.utc)
         
         # 3. Mettre à jour les compteurs sold_count pour chaque pack
         if order.items and len(order.items) > 0:

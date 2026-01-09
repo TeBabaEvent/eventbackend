@@ -27,6 +27,16 @@ class CartCheckoutRequest(BaseModel):
     customer_phone: str | None = None
     payment_method: str = "online"  # online, cash
 
+    # GDPR Consent - Mandatory
+    terms_accepted: bool = False
+
+    @field_validator('terms_accepted')
+    @classmethod
+    def validate_terms_accepted(cls, v):
+        if not v:
+            raise ValueError('You must accept the terms and conditions')
+        return v
+
     @field_validator('payment_method')
     @classmethod
     def validate_payment_method(cls, v):

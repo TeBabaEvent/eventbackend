@@ -4,7 +4,7 @@ from pydantic import BaseModel, EmailStr
 from typing import Optional
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import select
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import os
 import logging
 
@@ -32,6 +32,9 @@ class CheckoutRequest(BaseModel):
     customer_name: str
     customer_email: EmailStr
     customer_phone: Optional[str] = None
+    
+    # GDPR Consent - Mandatory
+    terms_accepted: bool = False
 
 
 class CheckoutResponse(BaseModel):
@@ -154,7 +157,12 @@ async def create_checkout_session(
         customer_email=checkout_request.customer_email,
         customer_name=checkout_request.customer_name,
         customer_phone=checkout_request.customer_phone,
-        expires_at=datetime.utcnow() + timedelta(minutes=ORDER_PENDING_TIMEOUT_MINUTES)
+        
+        # GDPR Consent
+        terms_accepted=checkout_request.terms_accepted,
+        terms_accepted_at=datetime.now(timezone.utc),
+        
+        expires_at=datetime.now(timezone.utc) + timedelta(minutes=ORDER_PENDING_TIMEOUT_MINUTES)
     )
 
     db.add(order)
@@ -170,7 +178,7 @@ async def create_checkout_session(
         try:
             # Compléter la commande immédiatement (pas de paiement nécessaire)
             order.status = "completed"
-            order.paid_at = datetime.utcnow()
+            order.paid_at = datetime.now(timezone.utc)
 
             # Mettre à jour le compteur de ventes
             event_pack.sold_count = (event_pack.sold_count or 0) + checkout_request.quantity
@@ -382,7 +390,12 @@ async def create_cart_checkout_session(
         customer_email=cart_request.customer_email,
         customer_name=cart_request.customer_name,
         customer_phone=cart_request.customer_phone,
-        expires_at=datetime.utcnow() + timedelta(minutes=ORDER_PENDING_TIMEOUT_MINUTES)
+        
+        # GDPR Consent
+        terms_accepted=cart_request.terms_accepted,
+        terms_accepted_at=datetime.now(timezone.utc),
+        
+        expires_at=datetime.now(timezone.utc) + timedelta(minutes=ORDER_PENDING_TIMEOUT_MINUTES)
     )
 
     db.add(order)
@@ -443,7 +456,7 @@ async def create_cart_checkout_session(
 
         # Compléter la commande immédiatement (pas de paiement nécessaire)
         order.status = "completed"
-        order.paid_at = datetime.utcnow()
+        order.paid_at = datetime.now(timezone.utc)
 
         # Mettre à jour le compteur de ventes pour chaque pack
         for item_data in validated_items:
@@ -645,7 +658,7 @@ async def capture_payment(
 
     # 5. Finaliser la commande
     order.status = "completed"
-    order.paid_at = datetime.utcnow()
+    order.paid_at = datetime.now(timezone.utc)
     
     # Update sold counts
     items = db.query(models.OrderItem).filter(models.OrderItem.order_id == order.id).all()

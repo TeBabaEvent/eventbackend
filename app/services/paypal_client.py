@@ -9,7 +9,7 @@ import httpx
 import base64
 import logging
 from typing import Optional, Dict, Any
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 logger = logging.getLogger(__name__)
 
@@ -78,7 +78,7 @@ class PayPalPaymentClient:
         """Obtient un access token OAuth2 (avec cache)."""
         # Vérifier si le token est encore valide
         if self._access_token and self._token_expires_at:
-            if datetime.utcnow() < self._token_expires_at:
+            if datetime.now(timezone.utc) < self._token_expires_at:
                 return self._access_token
 
         # Obtenir un nouveau token
@@ -98,7 +98,7 @@ class PayPalPaymentClient:
             self._access_token = result["access_token"]
             expires_in = result.get("expires_in", 3600)
             # Expire 5 minutes avant pour éviter les problèmes
-            self._token_expires_at = datetime.utcnow() + timedelta(seconds=expires_in - 300)
+            self._token_expires_at = datetime.now(timezone.utc) + timedelta(seconds=expires_in - 300)
             
             logger.info("✅ PayPal access token obtenu")
             return self._access_token
@@ -413,17 +413,29 @@ def verify_webhook_signature(
         bool: True si signature valide
     """
     import json
+    from app.core.config import settings
     
-    # Si pas de webhook_id configuré, on accepte (mode dégradé)
+    # Si pas de webhook_id configuré
     if not webhook_id:
-        logger.warning("⚠️ PAYPAL_WEBHOOK_ID non configuré - signature non vérifiée")
+        if settings.is_production:
+            logger.error("❌ PAYPAL_WEBHOOK_ID non configuré en production - requête rejetée")
+            return False
+        logger.warning("⚠️ PAYPAL_WEBHOOK_ID non configuré - signature non vérifiée (dev only)")
         return True
     
     # Utiliser l'instance globale si non fournie
     client = paypal_client_instance or paypal_client
     if not client:
-        logger.warning("⚠️ PayPal client non disponible - signature non vérifiée")
+        if settings.is_production:
+            logger.error("❌ PayPal client non disponible en production - requête rejetée")
+            return False
+        logger.warning("⚠️ PayPal client non disponible - signature non vérifiée (dev only)")
         return True
+    
+    # Vérifier que les headers requis sont présents
+    if not all([transmission_id, timestamp, webhook_signature, cert_url, auth_algo]):
+        logger.warning("❌ Headers PayPal manquants pour la vérification de signature")
+        return False
     
     try:
         # Décoder le body JSON
@@ -457,8 +469,13 @@ def verify_webhook_signature(
             
     except Exception as e:
         logger.error(f"Erreur vérification signature webhook: {e}")
-        # En cas d'erreur de vérification, on accepte quand même
-        # pour ne pas bloquer les paiements légitimes
+        # En production, rejeter en cas d'erreur de vérification
+        # PayPal renverra le webhook plus tard
+        if settings.is_production:
+            logger.error("❌ Erreur de vérification en production - requête rejetée (PayPal réessayera)")
+            return False
+        # En dev, accepter pour faciliter le développement
+        logger.warning("⚠️ Erreur de vérification acceptée en dev uniquement")
         return True
 
 

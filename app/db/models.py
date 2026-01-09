@@ -66,6 +66,11 @@ class User(Base):
     phone = Column(String(50), nullable=True)  # Téléphone pour stewards
     is_active = Column(Boolean, default=True, nullable=False, index=True)  # Index for filtering active users
     last_login = Column(DateTime(timezone=True), nullable=True)  # Dernière connexion
+    
+    # GDPR Consent
+    terms_accepted = Column(Boolean, default=False, nullable=False)
+    terms_accepted_at = Column(DateTime(timezone=True), nullable=True)
+
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
@@ -243,6 +248,10 @@ class Order(Base):
     customer_name = Column(String(255), nullable=False)
     customer_phone = Column(String(50), nullable=True)
 
+    # GDPR Consent
+    terms_accepted = Column(Boolean, default=False, nullable=False)
+    terms_accepted_at = Column(DateTime(timezone=True), nullable=True)
+
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)  # Index for date filtering and sorting
     paid_at = Column(DateTime(timezone=True), nullable=True)
@@ -276,8 +285,8 @@ class Order(Base):
         """True if pending order has expired"""
         if self.status != "pending" or not self.expires_at:
             return False
-        from datetime import datetime
-        return datetime.utcnow() > self.expires_at.replace(tzinfo=None)
+        from datetime import datetime, timezone
+        return datetime.now(timezone.utc) > self.expires_at.replace(tzinfo=timezone.utc)
 
     @property
     def pack_items_list(self) -> list:

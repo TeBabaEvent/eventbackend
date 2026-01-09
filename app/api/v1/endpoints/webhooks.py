@@ -1,13 +1,14 @@
 """Routes pour les webhooks de paiement"""
 from fastapi import APIRouter, Request, HTTPException, BackgroundTasks, Depends
 from sqlalchemy.orm import Session, joinedload
-from datetime import datetime
+from datetime import datetime, timezone
 import logging
-import httpx
+import json
 
 from app.db.database import get_db
 from app.db import models
 from app.services.ticket_service import generate_tickets_for_order
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -38,11 +39,30 @@ async def paypal_webhook(
     Returns:
         dict: {"status": "processed"} ou {"status": "error"}
     """
-    from app.services.paypal_client import paypal_client
+    from app.services.paypal_client import paypal_client, verify_webhook_signature
     
-    # Récupérer le JSON
+    # Récupérer le body brut AVANT le parsing JSON (nécessaire pour la vérification de signature)
+    raw_body = await request.body()
+    
+    # Vérifier la signature PayPal
+    signature_verified = verify_webhook_signature(
+        webhook_id=settings.paypal_webhook_id,
+        transmission_id=request.headers.get("PAYPAL-TRANSMISSION-ID"),
+        timestamp=request.headers.get("PAYPAL-TRANSMISSION-TIME"),
+        webhook_signature=request.headers.get("PAYPAL-TRANSMISSION-SIG"),
+        cert_url=request.headers.get("PAYPAL-CERT-URL"),
+        auth_algo=request.headers.get("PAYPAL-AUTH-ALGO"),
+        raw_body=raw_body,
+        paypal_client_instance=paypal_client
+    )
+    
+    if not signature_verified:
+        logger.warning("❌ Signature webhook PayPal invalide - requête rejetée")
+        raise HTTPException(status_code=401, detail="Invalid webhook signature")
+    
+    # Parser le JSON
     try:
-        body = await request.json()
+        body = json.loads(raw_body.decode('utf-8'))
     except Exception:
         logger.warning("Webhook PayPal reçu avec body invalide")
         return {"status": "invalid_body"}
@@ -118,7 +138,7 @@ async def paypal_webhook(
             if capture_result.get("status") == "COMPLETED":
                 # Paiement réussi !
                 order.status = "completed"
-                order.paid_at = datetime.utcnow()
+                order.paid_at = datetime.now(timezone.utc)
                 
                 # Mettre à jour les compteurs
                 if order.items:
@@ -146,7 +166,7 @@ async def paypal_webhook(
             # Capture complétée (peut arriver après CHECKOUT.ORDER.APPROVED)
             if order.status == "pending":
                 order.status = "completed"
-                order.paid_at = datetime.utcnow()
+                order.paid_at = datetime.now(timezone.utc)
                 
                 # Mettre à jour les compteurs
                 if order.items:
@@ -176,7 +196,7 @@ async def paypal_webhook(
         
         # Marquer webhook comme traité
         webhook_event.status = "processed"
-        webhook_event.processed_at = datetime.utcnow()
+        webhook_event.processed_at = datetime.now(timezone.utc)
         db.commit()
         
         return {"status": "processed"}

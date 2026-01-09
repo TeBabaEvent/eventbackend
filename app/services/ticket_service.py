@@ -3,7 +3,7 @@ Service de génération et gestion des tickets
 Génère les tickets avec QR codes JWT signés
 """
 import jwt
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from io import BytesIO
 from sqlalchemy.orm import Session
 from typing import List, Optional
@@ -61,7 +61,7 @@ def generate_ticket_qr_data(ticket: Ticket, event: Event) -> str:
         event_date = datetime.strptime(event.date, "%Y-%m-%d")
     except (ValueError, AttributeError):
         # Si parsing échoue, utiliser 7 jours à partir d'aujourd'hui
-        event_date = datetime.utcnow()
+        event_date = datetime.now(timezone.utc)
         logger.warning(f"Date événement invalide: {event.date}, utilisation date actuelle")
 
     expiration = event_date + timedelta(days=1)  # Expire 24h après l'événement
@@ -74,7 +74,7 @@ def generate_ticket_qr_data(ticket: Ticket, event: Event) -> str:
         "pack_id": ticket.pack_id,
         "pack_name": ticket.pack_name or "Standard",
         "holder": ticket.holder_name or "Invité",
-        "iat": datetime.utcnow(),
+        "iat": datetime.now(timezone.utc),
         "exp": expiration
     }
 

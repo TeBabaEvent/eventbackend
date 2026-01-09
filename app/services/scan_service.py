@@ -3,7 +3,7 @@ Service de validation des scans de tickets
 Gère la validation des QR codes et le logging des scans
 """
 import jwt
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 from typing import Optional, Dict, Any
 import logging
@@ -281,7 +281,7 @@ def validate_ticket_scan(
     
     # ========== 5. SUCCÈS - MARQUER COMME UTILISÉ ==========
     ticket.status = "used"
-    ticket.scanned_at = datetime.utcnow()
+    ticket.scanned_at = datetime.now(timezone.utc)
     ticket.scanned_by = steward_id
     
     # Logger et commit
