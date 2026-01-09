@@ -1,7 +1,7 @@
 """
-Script de démarrage de l'application Tebaba Backend
+Script de démarrage de l'application BABA Event Backend
 Lance le serveur uvicorn avec la configuration appropriée
-POUR DÉVELOPPEMENT LOCAL UNIQUEMENT - En production, utilisez Procfile
+POUR DÉVELOPPEMENT LOCAL UNIQUEMENT - En production, utilisez systemd/gunicorn
 """
 import uvicorn
 from app.core.config import settings
@@ -10,8 +10,7 @@ if __name__ == "__main__":
     # Ce script est pour le développement local uniquement
     if settings.is_production:
         print("⚠️ ATTENTION: Vous essayez de lancer le serveur en mode production avec run.py")
-        print("⚠️ En production, utilisez: uvicorn app.main:app --host 0.0.0.0 --port $PORT --workers 2")
-        print("⚠️ Ou laissez Railway utiliser le Procfile")
+        print("⚠️ En production, utilisez systemd avec gunicorn (voir /etc/systemd/system/baba-backend.service)")
         exit(1)
     
     uvicorn.run(

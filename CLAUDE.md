@@ -16,9 +16,10 @@ python run.py
 ```
 The server runs with hot reload on `http://127.0.0.1:8000`
 
-**Production (Railway/deployment):**
+**Production (OVH VPS):**
+The backend runs on OVH VPS with systemd and gunicorn. See `/etc/systemd/system/baba-backend.service`.
 ```bash
-uvicorn app.main:app --host 0.0.0.0 --port $PORT --workers 2
+sudo systemctl restart baba-backend
 ```
 
 ### Database Migrations
@@ -262,7 +263,7 @@ title = event.title_translations.get(lang, event.title)
 2. **Migrations**: Default disabled on startup to prevent accidental schema changes in production
 3. **GZip middleware**: Disabled due to Python 3.14 bug - use reverse proxy (Caddy/Nginx) instead
 4. **API docs**: Automatically disabled in production (`docs_url=None` when `ENVIRONMENT=production`)
-5. **WeasyPrint**: Requires system libraries - configured in `nixpacks.toml` for Railway deployment
+5. **WeasyPrint**: Requires system libraries - installed via `apt` on Ubuntu VPS
 6. **Index strategy**: Composite indexes defined in `models.py` for common query patterns
 7. **Webhook idempotency**: Always check `WebhookEvent` table before processing to prevent duplicates
 8. **QR code security**: Use `JWT_SECRET_KEY` (not `SECRET_KEY`) for ticket QR codes

@@ -266,31 +266,42 @@ lsof -i :8000
 
 Plus besoin de gérer manuellement les migrations !
 
-## 🚀 Déploiement sur Railway
+## 🚀 Déploiement sur OVH VPS
 
-Ce projet est prêt pour être déployé sur Railway ! 🎉
+Ce projet est déployé sur un VPS OVH avec Ubuntu 24.04.
 
-### 🎯 Déploiement Rapide
+### 🎯 Architecture
 
-1. **Push votre code** sur GitHub/GitLab/Bitbucket
-2. **Créez un nouveau projet** sur [Railway](https://railway.app/)
-3. **Connectez votre repository**
-4. **Configurez les variables d'environnement** (voir ci-dessous)
-5. **Déployez automatiquement** ! ✨
+- **Backend** : VPS OVH (https://api.baba.events)
+- **Frontend** : Railway (https://www.baba.events)
+- **Base de données** : Railway MySQL
 
-### 📝 Variables d'Environnement Requises
+### 📝 Configuration Serveur
 
-```env
-ENVIRONMENT=production
-SECRET_KEY=<générez-avec-openssl-rand-hex-32>
-DATABASE_URL=${{MySQL.DATABASE_URL}}
-CORS_ORIGINS=https://votre-frontend.com
-DEBUG=false
+Le backend tourne avec :
+- **Gunicorn** : 4 workers avec UvicornWorker
+- **Nginx** : Reverse proxy avec SSL (Let's Encrypt)
+- **Systemd** : Service auto-restart
+
+### 🔄 CI/CD
+
+Déploiement automatique via GitHub Actions sur push vers `main` :
+```bash
+git push origin main  # Déclenche le déploiement automatique
 ```
 
-### 📚 Guide Complet
+### 📋 Commandes Utiles (sur le VPS)
 
-Pour des instructions détaillées de déploiement, consultez **[DEPLOYMENT.md](./DEPLOYMENT.md)**
+```bash
+# Voir les logs
+sudo journalctl -u baba-backend -f
+
+# Redémarrer le service
+sudo systemctl restart baba-backend
+
+# Vérifier le statut
+sudo systemctl status baba-backend
+```
 
 ### ✅ Fonctionnalités Production-Ready
 
@@ -302,29 +313,14 @@ Pour des instructions détaillées de déploiement, consultez **[DEPLOYMENT.md](
 - ✅ **Error Handling** global
 - ✅ **Docs API** désactivées en production
 - ✅ **Connection Pooling** optimisé
-- ✅ **Multi-workers** support
+- ✅ **Multi-workers** support (4 workers Gunicorn)
+- ✅ **SSL/HTTPS** avec Let's Encrypt (renouvellement auto)
 
 ### 🔒 Sécurité
 
 - Secret key validation
 - CORS restrictif
 - Passwords hashés avec bcrypt
-- JWT tokens sécurisés
+- JWT tokens sécurisés (httpOnly cookies)
 - Variables d'environnement protégées
-
-### 📊 Monitoring
-
-Railway fournit :
-- Logs en temps réel
-- Métriques de performance
-- Alertes automatiques
-- Health check monitoring
-
----
-
-Pour déployer sur **d'autres plateformes** (Heroku, DigitalOcean, etc.) :
-
-```bash
-# Production avec Uvicorn
-uvicorn app.main:app --host 0.0.0.0 --port $PORT --workers 2
-```
+- HTTPS forcé via Nginx

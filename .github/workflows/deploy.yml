@@ -1,0 +1,25 @@
+name: Deploy to OVH VPS
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            cd /var/www/baba-backend
+            git pull origin main
+            source venv/bin/activate
+            pip install -r requirements.txt --quiet
+            sudo systemctl restart baba-backend
+            echo "✅ Deployment complete!"

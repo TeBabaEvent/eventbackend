@@ -50,12 +50,12 @@ class Settings(BaseSettings):
     jwt_secret_key: Optional[str] = None
 
     # URLs pour paiement
-    base_url: str = "https://eventbackend-production-039e.up.railway.app"
+    base_url: str = "https://api.baba.events"  # OVH VPS
     frontend_url: str = "https://www.baba.events"
 
     # SMTP Email Configuration (OVH, Gmail, ou autre)
     smtp_host: str = "ssl0.ovh.net"  # OVH par défaut
-    smtp_port: int = 465  # Port SSL (465) - Railway bloque souvent le port 587
+    smtp_port: int = 465  # Port SSL (465)
     smtp_email: Optional[str] = None  # info@baba.events
     smtp_password: Optional[str] = None
     email_from_name: str = "BABA Event"
@@ -108,7 +108,7 @@ class Settings(BaseSettings):
 
     def get_database_url(self) -> str:
         """Construire l'URL de la base de données"""
-        # Priorité à DATABASE_URL si fournie (typique pour Railway, Heroku, etc.)
+        # Priorité à DATABASE_URL si fournie (variable d'environnement)
         if self.database_url:
             # S'assurer que l'URL utilise pymysql
             if self.database_url.startswith("mysql://"):

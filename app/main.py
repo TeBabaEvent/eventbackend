@@ -39,7 +39,7 @@ async def lifespan(app: FastAPI):
     db_url = settings.get_database_url()
     if "localhost" in db_url:
         logger.warning("⚠️ ATTENTION: L'app se connecte à LOCALHOST!")
-        logger.warning("⚠️ Vérifiez que DATABASE_URL est bien configurée dans Railway")
+        logger.warning("⚠️ Vérifiez que DATABASE_URL est bien configurée dans .env")
     else:
         logger.info(f"📊 Connexion DB configurée (host: {settings.mysql_host if not settings.database_url else 'depuis DATABASE_URL'})")
     
