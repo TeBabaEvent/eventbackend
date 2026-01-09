@@ -173,12 +173,21 @@ async def refund_order(
                 detail="Impossible de trouver l'ID de capture PayPal pour cette commande"
             )
         
-        # 3. Appeler l'API PayPal pour rembourser
+        # 3. Appeler l'API PayPal pour rembourser (avec idempotence)
         refund_result = paypal_client.create_refund(
             capture_id=capture_id,
             amount=refund_amount if request.amount is not None else None,  # None = remboursement total
-            note=request.reason or f"Remboursement {order.order_number}"
+            note=request.reason or f"Remboursement {order.order_number}",
+            order_number=order.order_number  # Pour l'idempotence
         )
+        
+        # Vérifier le statut du remboursement PayPal
+        if refund_result.get("status") not in ["COMPLETED", "PENDING"]:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Le remboursement PayPal a échoué avec le statut: {refund_result.get('status')}"
+            )
+        
         logger.info(f"Remboursement PayPal réussi: {refund_result}")
 
     except HTTPException:

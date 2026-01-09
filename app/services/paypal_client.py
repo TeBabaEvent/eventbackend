@@ -408,7 +408,8 @@ class PayPalPaymentClient:
         self,
         capture_id: str,
         amount: float = None,
-        note: str = None
+        note: str = None,
+        order_number: str = None
     ) -> Dict[str, Any]:
         """
         Rembourse un paiement PayPal (total ou partiel).
@@ -417,6 +418,7 @@ class PayPalPaymentClient:
             capture_id: ID de la capture PayPal
             amount: Montant à rembourser en EUR (None = total)
             note: Note du remboursement
+            order_number: Numéro de commande pour l'idempotence
 
         Returns:
             dict: Détails du remboursement
@@ -433,17 +435,26 @@ class PayPalPaymentClient:
             if note:
                 refund_data["note_to_payer"] = note
 
+            # Utiliser un idempotency key pour éviter les doubles remboursements
+            idempotency_key = f"refund-{order_number or capture_id}"
+            
             result = self._make_request(
                 "POST", 
                 f"/v2/payments/captures/{capture_id}/refund", 
-                refund_data if refund_data else {}
+                refund_data if refund_data else {},
+                idempotency_key=idempotency_key
             )
             
-            logger.info(f"Remboursement PayPal créé: {result.get('id')}")
+            # Vérifier le statut du remboursement
+            refund_status = result.get("status")
+            if refund_status not in ["COMPLETED", "PENDING"]:
+                logger.warning(f"Remboursement PayPal statut inattendu: {refund_status}")
+            
+            logger.info(f"Remboursement PayPal créé: {result.get('id')} - Status: {refund_status}")
             
             return {
                 "id": result.get("id"),
-                "status": result.get("status"),
+                "status": refund_status,
                 "amount": result.get("amount")
             }
 
