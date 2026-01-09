@@ -230,15 +230,21 @@ class PayPalPaymentClient:
                     }
             order_data["payer"] = payer_data
 
-        # Mode redirect : on utilise application_context pour les URLs de retour
-        order_data["application_context"] = {
-            "brand_name": "BABA Events",
-            "locale": locale,
-            "landing_page": "NO_PREFERENCE",
-            "user_action": "PAY_NOW",
-            "return_url": return_url,
-            "cancel_url": cancel_url,
-            "shipping_preference": "NO_SHIPPING"
+        # Mode redirect avec toutes les méthodes de paiement (PayPal, Bancontact, carte, etc.)
+        # On utilise payment_source avec paypal pour accéder à la page checkout complète
+        order_data["payment_source"] = {
+            "paypal": {
+                "experience_context": {
+                    "brand_name": "BABA Events",
+                    "locale": locale,
+                    "landing_page": "NO_PREFERENCE",
+                    "user_action": "PAY_NOW",
+                    "return_url": return_url,
+                    "cancel_url": cancel_url,
+                    "shipping_preference": "NO_SHIPPING",
+                    "payment_method_preference": "UNRESTRICTED"
+                }
+            }
         }
 
         logger.info(f"Création commande PayPal: {amount_str} EUR - {description[:50]}")
