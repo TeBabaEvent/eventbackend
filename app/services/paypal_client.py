@@ -244,8 +244,8 @@ class PayPalPaymentClient:
                 "cancel_url": cancel_url,
                 "shipping_preference": "NO_SHIPPING"
             }
-            # Pré-remplir les infos du payeur
-            if payer_email or payer_name:
+            # Pré-remplir les infos du payeur (email, nom, téléphone)
+            if payer_email or payer_name or payer_phone:
                 payer_data = {}
                 if payer_email:
                     payer_data["email_address"] = payer_email
@@ -254,6 +254,15 @@ class PayPalPaymentClient:
                         "given_name": first_name,
                         "surname": last_name
                     }
+                if payer_phone:
+                    clean_phone = ''.join(c for c in payer_phone if c.isdigit() or c == '+')
+                    if clean_phone:
+                        payer_data["phone"] = {
+                            "phone_type": "MOBILE",
+                            "phone_number": {
+                                "national_number": clean_phone.lstrip('+')
+                            }
+                        }
                 order_data["payer"] = payer_data
             logger.info(f"Création commande PayPal Card: {amount_str} EUR")
             

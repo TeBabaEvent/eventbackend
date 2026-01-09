@@ -715,3 +715,48 @@ async def capture_payment(
 
     return {"status": "completed", "order_number": order.order_number}
 
+
+@router.post("/cancel/{order_number}")
+async def cancel_order(
+    order_number: str,
+    db: Session = Depends(get_db)
+):
+    """
+    Marque une commande comme annulée.
+    Appelé quand l'utilisateur annule le paiement sur PayPal.
+    
+    Seules les commandes en statut "pending" peuvent être annulées.
+    """
+    # Récupérer la commande
+    order = db.query(models.Order).filter(
+        models.Order.order_number == order_number
+    ).first()
+    
+    if not order:
+        raise HTTPException(status_code=404, detail="Commande non trouvée")
+    
+    # Vérifier que la commande peut être annulée
+    if order.status == "cancelled":
+        # Déjà annulée, on renvoie simplement le statut
+        return {"status": "cancelled", "order_number": order.order_number}
+    
+    if order.status == "completed":
+        # Une commande payée ne peut pas être annulée via cet endpoint
+        raise HTTPException(
+            status_code=400, 
+            detail="Impossible d'annuler une commande déjà payée"
+        )
+    
+    if order.status not in ["pending", "pending_cash"]:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Impossible d'annuler une commande avec le statut: {order.status}"
+        )
+    
+    # Annuler la commande
+    order.status = "cancelled"
+    db.commit()
+    
+    logger.info(f"Commande {order_number} annulée par l'utilisateur")
+    
+    return {"status": "cancelled", "order_number": order.order_number}
