@@ -6,7 +6,7 @@
     <style>
         /* ============================================
            BABA EVENT - Premium Ticket Design
-           Clean, Elegant & Professional
+           Optimized for A4 single page
            ============================================ */
         
         @page {
@@ -27,7 +27,7 @@
         }
         
         body {
-            font-family: sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             font-size: 11pt;
             line-height: 1.4;
             color: #1a1a1a;
@@ -55,8 +55,8 @@
            ============================================ */
         
         .header {
-            background: #0f0f0f;
-            padding: 24px 40px;
+            background: #0a0a0a;
+            padding: 20px 36px;
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -64,19 +64,19 @@
         }
         
         .logo {
-            height: 50px;
+            height: 44px;
             width: auto;
         }
         
         .logo-text {
-            font-size: 24pt;
+            font-size: 22pt;
             font-weight: 800;
-            letter-spacing: 4px;
+            letter-spacing: 3px;
             color: #ffffff;
         }
         
         .logo-text span {
-            color: #e63946;
+            color: #dc143c;
         }
         
         .header-right {
@@ -84,20 +84,19 @@
         }
         
         .header-label {
-            font-size: 8pt;
-            color: #666666;
+            font-size: 7pt;
+            color: #888888;
             text-transform: uppercase;
-            letter-spacing: 3px;
-            margin-bottom: 4px;
+            letter-spacing: 2px;
+            margin-bottom: 3px;
         }
         
         .ticket-number {
-            font-size: 11pt;
+            font-size: 10pt;
             color: #ffffff;
-            font-family: monospace;
+            font-family: 'Courier New', monospace;
             font-weight: 600;
             letter-spacing: 1px;
-            opacity: 0.9;
         }
         
         /* ============================================
@@ -106,7 +105,7 @@
         
         .content {
             flex: 1;
-            padding: 30px 50px;
+            padding: 28px 44px;
             display: flex;
             flex-direction: column;
             overflow: hidden;
@@ -118,50 +117,51 @@
         
         .event-section {
             text-align: center;
-            padding-bottom: 25px;
-            margin-bottom: 20px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid #e5e5e5;
+            margin-bottom: 24px;
             flex-shrink: 0;
         }
         
         .event-title {
-            font-size: 28pt;
+            font-size: 26pt;
             font-weight: 700;
-            color: #0f0f0f;
-            margin-bottom: 20px;
-            line-height: 1.2;
+            color: #0a0a0a;
+            margin-bottom: 18px;
+            line-height: 1.15;
             letter-spacing: -0.5px;
         }
         
         .event-meta {
             display: flex;
             justify-content: center;
-            gap: 50px;
+            gap: 24px;
         }
         
         .meta-item {
             text-align: center;
-            padding: 12px 20px;
-            background: #f8f9fa;
-            border-radius: 8px;
-            min-width: 140px;
+            padding: 10px 20px;
+            background: #f5f5f5;
+            border-radius: 6px;
+            min-width: 120px;
         }
         
         .meta-label {
-            font-size: 8pt;
-            color: #6c757d;
+            font-size: 7pt;
+            color: #666666;
             text-transform: uppercase;
-            letter-spacing: 2px;
-            margin-bottom: 6px;
+            letter-spacing: 1.5px;
+            margin-bottom: 4px;
         }
         
         .meta-value {
-            font-size: 12pt;
+            font-size: 11pt;
             font-weight: 600;
-            color: #212529;
+            color: #1a1a1a;
         }
         
         /* ============================================
-           QR CODE SECTION - CENTERED & ELEGANT
+           QR CODE SECTION - LARGE & CENTERED
            ============================================ */
         
         .qr-section {
@@ -170,7 +170,7 @@
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            padding: 10px 0;
+            padding: 16px 0;
             min-height: 0;
         }
         
@@ -180,36 +180,50 @@
         
         .qr-wrapper {
             background: #ffffff;
-            padding: 20px;
-            border: 2px solid #e9ecef;
-            border-radius: 16px;
+            padding: 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 12px;
             display: inline-block;
-            margin-bottom: 16px;
+            margin-bottom: 14px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
         }
         
         .qr-image {
-            width: 160px;
-            height: 160px;
+            width: 220px;
+            height: 220px;
             display: block;
         }
         
+        .scan-instruction {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            margin-bottom: 14px;
+        }
+        
+        .scan-icon {
+            width: 18px;
+            height: 18px;
+            opacity: 0.6;
+        }
+        
         .scan-label {
-            font-size: 11pt;
-            color: #495057;
-            margin-bottom: 12px;
+            font-size: 10pt;
+            color: #555555;
             font-weight: 400;
         }
         
         .ticket-code-wrapper {
             display: inline-block;
-            background: #0f0f0f;
-            padding: 12px 28px;
+            background: #0a0a0a;
+            padding: 10px 24px;
             border-radius: 6px;
         }
         
         .ticket-code {
-            font-family: monospace;
-            font-size: 14pt;
+            font-family: 'Courier New', monospace;
+            font-size: 13pt;
             font-weight: 700;
             color: #ffffff;
             letter-spacing: 2px;
@@ -220,22 +234,23 @@
            ============================================ */
         
         .info-notice {
-            margin-top: 20px;
-            padding: 14px 24px;
-            background: #f8f9fa;
-            border-radius: 8px;
-            border-left: 3px solid #0f0f0f;
+            margin-top: 18px;
+            padding: 12px 20px;
+            background: #fafafa;
+            border-radius: 6px;
+            border-left: 3px solid #0a0a0a;
+            max-width: 400px;
         }
         
         .info-notice p {
-            color: #495057;
-            font-size: 10pt;
-            line-height: 1.5;
+            color: #555555;
+            font-size: 9pt;
+            line-height: 1.45;
             margin: 0;
         }
         
         .info-notice strong {
-            color: #212529;
+            color: #1a1a1a;
             font-weight: 600;
         }
         
@@ -247,8 +262,8 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 20px 0;
-            border-top: 1px solid #e9ecef;
+            padding: 16px 0;
+            border-top: 1px solid #e5e5e5;
             margin-top: auto;
             flex-shrink: 0;
         }
@@ -259,30 +274,30 @@
         }
         
         .detail-box:not(:last-child) {
-            border-right: 1px solid #e9ecef;
+            border-right: 1px solid #e5e5e5;
         }
         
         .detail-label {
-            font-size: 8pt;
-            color: #6c757d;
+            font-size: 7pt;
+            color: #666666;
             text-transform: uppercase;
             letter-spacing: 1.5px;
-            margin-bottom: 6px;
+            margin-bottom: 5px;
         }
         
         .detail-value {
-            font-size: 12pt;
+            font-size: 11pt;
             font-weight: 600;
-            color: #212529;
+            color: #1a1a1a;
         }
         
         .pack-badge {
             display: inline-block;
-            background: #0f0f0f;
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 100%);
             color: #ffffff;
-            font-size: 10pt;
+            font-size: 9pt;
             font-weight: 600;
-            padding: 8px 18px;
+            padding: 6px 16px;
             border-radius: 4px;
             text-transform: uppercase;
             letter-spacing: 1px;
@@ -293,8 +308,8 @@
            ============================================ */
         
         .footer {
-            background: #f8f9fa;
-            padding: 14px 40px;
+            background: #f5f5f5;
+            padding: 12px 36px;
             flex-shrink: 0;
         }
         
@@ -307,14 +322,42 @@
         .footer-left,
         .footer-center,
         .footer-right {
-            font-size: 8pt;
-            color: #6c757d;
-            letter-spacing: 0.5px;
+            font-size: 7pt;
+            color: #888888;
+            letter-spacing: 0.3px;
         }
         
         .footer-center {
             font-weight: 500;
-            color: #495057;
+            color: #666666;
+        }
+        
+        /* ============================================
+           LOCATION STYLING
+           ============================================ */
+        
+        .location-section {
+            margin-top: 16px;
+            padding: 12px 20px;
+            background: #f5f5f5;
+            border-radius: 6px;
+            text-align: center;
+        }
+        
+        .location-icon {
+            font-size: 10pt;
+            margin-right: 6px;
+        }
+        
+        .location-text {
+            font-size: 10pt;
+            color: #333333;
+        }
+        
+        .location-address {
+            font-size: 9pt;
+            color: #666666;
+            margin-top: 4px;
         }
     </style>
 </head>
@@ -355,20 +398,28 @@
                 </div>
             </section>
             
-            <!-- QR CODE -->
+            <!-- QR CODE - LARGER -->
             <section class="qr-section">
                 <div class="qr-container">
                     <div class="qr-wrapper">
                         <img class="qr-image" src="data:image/png;base64,{{ ticket.qr_base64 }}" alt="QR Code">
                     </div>
-                    <div class="scan-label">Présentez ce QR code à l'entrée</div>
+                    
+                    <div class="scan-instruction">
+                        <svg class="scan-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M3 7V5a2 2 0 012-2h2M17 3h2a2 2 0 012 2v2M21 17v2a2 2 0 01-2 2h-2M7 21H5a2 2 0 01-2-2v-2"/>
+                            <rect x="7" y="7" width="10" height="10" rx="1"/>
+                        </svg>
+                        <span class="scan-label">Présentez ce QR code à l'entrée</span>
+                    </div>
+                    
                     <div class="ticket-code-wrapper">
                         <span class="ticket-code">{{ ticket.ticket_code }}</span>
                     </div>
-                </div>
-                
-                <div class="info-notice">
-                    <p><strong>Important :</strong> Ce billet est personnel et ne peut être utilisé qu'une seule fois.</p>
+                    
+                    <div class="info-notice">
+                        <p><strong>Important :</strong> Ce billet est personnel et nominatif. Il ne peut être utilisé qu'une seule fois. Conservez-le précieusement.</p>
+                    </div>
                 </div>
             </section>
             
@@ -383,8 +434,8 @@
                     <div class="pack-badge">{{ ticket.pack_name or 'Standard' }}</div>
                 </div>
                 <div class="detail-box">
-                    <div class="detail-label">Commande</div>
-                    <div class="detail-value">#{{ order.order_number }}</div>
+                    <div class="detail-label">N° Commande</div>
+                    <div class="detail-value">{{ order.order_number }}</div>
                 </div>
             </section>
         </div>
@@ -392,9 +443,9 @@
         <!-- FOOTER -->
         <footer class="footer">
             <div class="footer-content">
-                <div class="footer-left">© {{ current_year }} BABA Event • www.baba.events</div>
+                <div class="footer-left">© {{ current_year }} BABA Event</div>
                 <div class="footer-center">Billet {{ ticket_index }} sur {{ total_tickets }}</div>
-                <div class="footer-right">{{ order.order_number }}</div>
+                <div class="footer-right">www.baba.events</div>
             </div>
         </footer>
     </div>
