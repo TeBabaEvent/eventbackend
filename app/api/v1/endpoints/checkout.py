@@ -520,7 +520,8 @@ async def create_cart_checkout_session(
             locale="fr-BE",
             payer_email=order.customer_email,
             payer_name=order.customer_name,
-            payer_phone=order.customer_phone
+            payer_phone=order.customer_phone,
+            payment_source=cart_request.payment_source  # bancontact, card, paypal
         )
 
         # 6. Sauvegarder l'ID de la commande PayPal

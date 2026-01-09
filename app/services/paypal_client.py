@@ -164,7 +164,8 @@ class PayPalPaymentClient:
         locale: str = "fr-BE",
         payer_email: Optional[str] = None,
         payer_name: Optional[str] = None,
-        payer_phone: Optional[str] = None
+        payer_phone: Optional[str] = None,
+        payment_source: Optional[str] = None  # paypal, bancontact, card
     ) -> Dict[str, Any]:
         """
         Crée une commande PayPal (mode redirect).
@@ -180,6 +181,7 @@ class PayPalPaymentClient:
             payer_email: Email du client (pour pré-remplir sur PayPal)
             payer_name: Nom complet du client (pour pré-remplir sur PayPal)
             payer_phone: Téléphone du client (pour pré-remplir sur PayPal)
+            payment_source: Méthode de paiement (paypal, bancontact, card)
 
         Returns:
             dict: {
@@ -205,47 +207,89 @@ class PayPalPaymentClient:
             }]
         }
 
-        # Pré-remplir les informations du payeur si fournies
-        # Cela permet de pré-remplir les champs sur la page PayPal (Bancontact, carte, etc.)
-        if payer_email or payer_name or payer_phone:
-            payer_data = {}
-            if payer_email:
-                payer_data["email_address"] = payer_email
-            if payer_name:
-                # Séparer le nom en prénom/nom
-                name_parts = payer_name.strip().split(" ", 1)
-                payer_data["name"] = {
-                    "given_name": name_parts[0],
-                    "surname": name_parts[1] if len(name_parts) > 1 else name_parts[0]
-                }
-            if payer_phone:
-                # Nettoyer le numéro de téléphone (garder uniquement chiffres et +)
-                clean_phone = ''.join(c for c in payer_phone if c.isdigit() or c == '+')
-                if clean_phone:
-                    payer_data["phone"] = {
-                        "phone_type": "MOBILE",
-                        "phone_number": {
-                            "national_number": clean_phone.lstrip('+')
-                        }
-                    }
-            order_data["payer"] = payer_data
+        # Extraire prénom et nom pour les APMs
+        first_name = ""
+        last_name = ""
+        if payer_name:
+            name_parts = payer_name.strip().split(" ", 1)
+            first_name = name_parts[0]
+            last_name = name_parts[1] if len(name_parts) > 1 else name_parts[0]
 
-        # Mode redirect avec toutes les méthodes de paiement (PayPal, Bancontact, carte, etc.)
-        # On utilise payment_source avec paypal pour accéder à la page checkout complète
-        order_data["payment_source"] = {
-            "paypal": {
-                "experience_context": {
-                    "brand_name": "BABA Events",
-                    "locale": locale,
-                    "landing_page": "NO_PREFERENCE",
-                    "user_action": "PAY_NOW",
-                    "return_url": return_url,
-                    "cancel_url": cancel_url,
-                    "shipping_preference": "NO_SHIPPING",
-                    "payment_method_preference": "UNRESTRICTED"
+        # Configuration selon la méthode de paiement
+        if payment_source == "bancontact":
+            # Bancontact nécessite payment_source avec les infos du payeur
+            order_data["payment_source"] = {
+                "bancontact": {
+                    "country_code": "BE",
+                    "name": payer_name or "Client",
+                    "experience_context": {
+                        "brand_name": "BABA Events",
+                        "locale": "fr-BE",
+                        "return_url": return_url,
+                        "cancel_url": cancel_url
+                    }
                 }
             }
-        }
+            logger.info(f"Création commande PayPal Bancontact: {amount_str} EUR")
+            
+        elif payment_source == "card":
+            # Pour carte, on utilise la page PayPal guest checkout
+            order_data["application_context"] = {
+                "brand_name": "BABA Events",
+                "locale": locale,
+                "landing_page": "GUEST_CHECKOUT",  # Force guest checkout for card
+                "user_action": "PAY_NOW",
+                "return_url": return_url,
+                "cancel_url": cancel_url,
+                "shipping_preference": "NO_SHIPPING"
+            }
+            # Pré-remplir les infos du payeur
+            if payer_email or payer_name:
+                payer_data = {}
+                if payer_email:
+                    payer_data["email_address"] = payer_email
+                if payer_name:
+                    payer_data["name"] = {
+                        "given_name": first_name,
+                        "surname": last_name
+                    }
+                order_data["payer"] = payer_data
+            logger.info(f"Création commande PayPal Card: {amount_str} EUR")
+            
+        else:
+            # PayPal wallet ou défaut
+            # Pré-remplir les informations du payeur si fournies
+            if payer_email or payer_name or payer_phone:
+                payer_data = {}
+                if payer_email:
+                    payer_data["email_address"] = payer_email
+                if payer_name:
+                    payer_data["name"] = {
+                        "given_name": first_name,
+                        "surname": last_name
+                    }
+                if payer_phone:
+                    clean_phone = ''.join(c for c in payer_phone if c.isdigit() or c == '+')
+                    if clean_phone:
+                        payer_data["phone"] = {
+                            "phone_type": "MOBILE",
+                            "phone_number": {
+                                "national_number": clean_phone.lstrip('+')
+                            }
+                        }
+                order_data["payer"] = payer_data
+
+            # Mode redirect standard : page PayPal avec toutes les options
+            order_data["application_context"] = {
+                "brand_name": "BABA Events",
+                "locale": locale,
+                "landing_page": "NO_PREFERENCE",
+                "user_action": "PAY_NOW",
+                "return_url": return_url,
+                "cancel_url": cancel_url,
+                "shipping_preference": "NO_SHIPPING"
+            }
+            logger.info(f"Création commande PayPal Wallet: {amount_str} EUR")
 
         logger.info(f"Création commande PayPal: {amount_str} EUR - {description[:50]}")
 

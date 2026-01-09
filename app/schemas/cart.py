@@ -26,6 +26,7 @@ class CartCheckoutRequest(BaseModel):
     customer_email: EmailStr
     customer_phone: str | None = None
     payment_method: str = "online"  # online, cash
+    payment_source: str | None = None  # paypal, bancontact, card (for online payments)
 
     # GDPR Consent - Mandatory
     terms_accepted: bool = False
