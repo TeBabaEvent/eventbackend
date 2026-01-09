@@ -71,6 +71,13 @@ async def lifespan(app: FastAPI):
         logger.warning(f"⚠️ Erreur démarrage scheduler: {e}")
         logger.warning("⚠️ Les jobs CRON ne seront pas exécutés")
     
+    # Pré-charger WeasyPrint pour accélérer la première génération de PDF
+    try:
+        from app.services.pdf_service import prewarm_weasyprint
+        prewarm_weasyprint()
+    except Exception as e:
+        logger.warning(f"⚠️ Erreur prewarm WeasyPrint: {e}")
+    
     yield
     
     # Shutdown

@@ -14,6 +14,7 @@ from jinja2 import Environment, FileSystemLoader
 
 # WeasyPrint lazy import - évite le crash au démarrage si les libs système manquent
 _weasyprint_html = None
+_weasyprint_css = None  # CSS stylesheet réutilisable (cache)
 _weasyprint_available = None
 
 def _configure_library_paths():
@@ -33,7 +34,7 @@ def _configure_library_paths():
 
 def _get_weasyprint():
     """Import WeasyPrint lazily pour éviter le crash au démarrage."""
-    global _weasyprint_html, _weasyprint_available
+    global _weasyprint_html, _weasyprint_css, _weasyprint_available
     if _weasyprint_available is None:
         # Configurer les chemins avant l'import
         _configure_library_paths()
@@ -44,8 +45,9 @@ def _get_weasyprint():
             logging.getLogger(lib).setLevel(logging.ERROR)
         
         try:
-            from weasyprint import HTML
+            from weasyprint import HTML, CSS
             _weasyprint_html = HTML
+            _weasyprint_css = CSS
             _weasyprint_available = True
             logging.getLogger(__name__).info("WeasyPrint chargé avec succès")
         except (ImportError, OSError) as e:
@@ -57,7 +59,22 @@ def _get_weasyprint():
             "WeasyPrint n'est pas disponible. Les dépendances système (pango, cairo, glib) "
             "ne sont pas correctement installées. La génération de PDF est désactivée."
         )
-    return _weasyprint_html
+    return _weasyprint_html, _weasyprint_css
+
+
+def prewarm_weasyprint():
+    """
+    Pré-charge WeasyPrint au démarrage de l'application.
+    Génère un mini PDF vide pour initialiser les caches internes.
+    Appelé depuis main.py au startup.
+    """
+    try:
+        HTML, _ = _get_weasyprint()
+        # Générer un mini PDF pour "réchauffer" le moteur
+        HTML(string="<html><body>warm</body></html>").write_pdf()
+        logging.getLogger(__name__).info("✅ WeasyPrint pré-chargé avec succès")
+    except Exception as e:
+        logging.getLogger(__name__).warning(f"WeasyPrint prewarm échoué: {e}")
 
 from app.db.models import Ticket, Order
 from app.services.ticket_service import generate_qr_image
@@ -82,7 +99,7 @@ jinja_env = Environment(
 
 # Thread pool for sync WeasyPrint operations
 # Augmenté pour permettre la génération parallèle de plusieurs PDFs
-_executor = ThreadPoolExecutor(max_workers=4)
+_executor = ThreadPoolExecutor(max_workers=8)
 
 # ============================================
 # HELPERS
@@ -143,7 +160,7 @@ def _get_logo_base64() -> str:
 
 def _render_pdf_sync(html_content: str, filepath: str) -> str:
     """Synchronous PDF rendering (runs in thread pool)."""
-    HTML = _get_weasyprint()
+    HTML, _ = _get_weasyprint()
     HTML(string=html_content).write_pdf(filepath)
     return filepath
 
