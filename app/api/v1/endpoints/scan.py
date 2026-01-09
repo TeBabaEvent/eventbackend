@@ -46,8 +46,8 @@ class ScanResponse(BaseModel):
 )
 @limiter.limit(RATE_LIMITS["scan"])  # 10 scans per second for quick scanning
 def validate_scan(
-    request_obj: Request,
-    request: ScanRequest,
+    request: Request,
+    scan_request: ScanRequest,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(require_steward)  # Injection de dépendance pour le contrôle d'accès
 ):
@@ -63,7 +63,7 @@ def validate_scan(
     - Ticket non annulé
 
     Args:
-        request: QR data (event_id optionnel)
+        scan_request: QR data (event_id optionnel)
         db: Session de base de données
         current_user: Utilisateur authentifié (steward/admin via require_steward)
 
@@ -73,10 +73,10 @@ def validate_scan(
 
     # Valider le scan (l'event_id est extrait du JWT automatiquement)
     result = validate_ticket_scan(
-        qr_data=request.qr_data,
+        qr_data=scan_request.qr_data,
         steward_id=current_user.id,
         db=db,
-        event_id=request.event_id  # Optionnel, pour vérification croisée si fourni
+        event_id=scan_request.event_id  # Optionnel, pour vérification croisée si fourni
     )
 
     logger.info(
