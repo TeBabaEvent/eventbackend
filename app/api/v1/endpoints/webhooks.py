@@ -129,7 +129,7 @@ async def paypal_webhook(
     try:
         # Traiter selon le type d'événement
         if event_type == "CHECKOUT.ORDER.APPROVED":
-            # L'ordre a été approuvé, il faut le capturer
+            # L'ordre a été approuvé (PayPal wallet), il faut le capturer
             logger.info(f"📝 Commande approuvée, capture en cours: {order.order_number}")
             
             paypal_order_id = resource.get("id")
@@ -137,6 +137,38 @@ async def paypal_webhook(
             
             if capture_result.get("status") == "COMPLETED":
                 # Paiement réussi !
+                if order.status != "completed":  # Idempotence
+                    order.status = "completed"
+                    order.paid_at = datetime.now(timezone.utc)
+                    
+                    # Mettre à jour les compteurs
+                    if order.items:
+                        for order_item in order.items:
+                            event_pack = db.query(models.EventPack).filter(
+                                models.EventPack.event_id == order_item.event_id,
+                                models.EventPack.pack_id == order_item.pack_id
+                            ).with_for_update().first()
+                            if event_pack:
+                                event_pack.sold_count = (event_pack.sold_count or 0) + order_item.quantity
+                    elif order.pack_id and order.quantity:
+                        event_pack = db.query(models.EventPack).filter(
+                            models.EventPack.event_id == order.event_id,
+                            models.EventPack.pack_id == order.pack_id
+                        ).with_for_update().first()
+                        if event_pack:
+                            event_pack.sold_count = (event_pack.sold_count or 0) + order.quantity
+                    
+                    db.commit()
+                    
+                    # Générer tickets en background
+                    background_tasks.add_task(process_successful_payment, order.id)
+                
+        elif event_type == "CHECKOUT.ORDER.COMPLETED":
+            # Pour les APMs (Bancontact, etc.), le paiement est capturé automatiquement
+            # On reçoit directement CHECKOUT.ORDER.COMPLETED sans besoin de capture manuelle
+            logger.info(f"📝 Commande APM complétée automatiquement: {order.order_number}")
+            
+            if order.status != "completed":  # Idempotence
                 order.status = "completed"
                 order.paid_at = datetime.now(timezone.utc)
                 

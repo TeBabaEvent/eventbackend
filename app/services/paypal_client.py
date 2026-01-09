@@ -233,11 +233,12 @@ class PayPalPaymentClient:
             logger.info(f"Création commande PayPal Bancontact: {amount_str} EUR")
             
         elif payment_source == "card":
-            # Pour carte, on utilise la page PayPal guest checkout
+            # Pour carte, on utilise la page PayPal standard avec landing_page BILLING
+            # qui affiche en premier l'option paiement par carte
             order_data["application_context"] = {
                 "brand_name": "BABA Events",
                 "locale": locale,
-                "landing_page": "GUEST_CHECKOUT",  # Force guest checkout for card
+                "landing_page": "BILLING",  # Montre d'abord l'option carte
                 "user_action": "PAY_NOW",
                 "return_url": return_url,
                 "cancel_url": cancel_url,
