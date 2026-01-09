@@ -594,6 +594,8 @@ def get_order_status(request: Request, order_number: str, db: Session = Depends(
             for ticket in order.tickets
         ]
 
+    logger.info(f"📋 GET order {order_number}: status={order.status}, tickets_generated={order.tickets_generated}")
+
     return {
         "order_number": order.order_number,
         "status": order.status,

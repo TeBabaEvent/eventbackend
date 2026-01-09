@@ -95,14 +95,23 @@ async def paypal_webhook(
     
     if not order:
         # Fallback par paypal_order_id
-        paypal_order_id = resource.get("id")
+        # Pour PAYMENT.CAPTURE.COMPLETED, resource.id est le capture_id, pas l'order_id
+        # On doit chercher dans supplementary_data.related_ids.order_id
+        paypal_order_id = resource.get("id")  # Might be capture_id for PAYMENT.CAPTURE.*
+        
+        # Try supplementary_data first (contains the actual PayPal order ID for captures)
+        supplementary = resource.get("supplementary_data", {})
+        related = supplementary.get("related_ids", {})
+        if related.get("order_id"):
+            paypal_order_id = related.get("order_id")
+        
         if paypal_order_id:
             order = db.query(models.Order).filter(
                 models.Order.paypal_order_id == paypal_order_id
             ).first()
     
     if not order:
-        logger.error(f"❌ Commande non trouvée: {order_number}")
+        logger.error(f"❌ Commande non trouvée: order_number={order_number}, paypal_id={resource.get('id')}")
         return {"status": "order_not_found"}
     
     # Idempotence check
@@ -138,6 +147,7 @@ async def paypal_webhook(
             if capture_result.get("status") == "COMPLETED":
                 # Paiement réussi !
                 if order.status != "completed":  # Idempotence
+                    logger.info(f"✅ Mise à jour statut commande {order.order_number}: pending -> completed")
                     order.status = "completed"
                     order.paid_at = datetime.now(timezone.utc)
                     
@@ -159,9 +169,12 @@ async def paypal_webhook(
                             event_pack.sold_count = (event_pack.sold_count or 0) + order.quantity
                     
                     db.commit()
+                    logger.info(f"✅ Commande {order.order_number} commitée avec status=completed")
                     
                     # Générer tickets en background
                     background_tasks.add_task(process_successful_payment, order.id)
+                else:
+                    logger.info(f"ℹ️ Commande {order.order_number} déjà completed, skip")
                 
         elif event_type == "CHECKOUT.ORDER.COMPLETED":
             # Pour les APMs (Bancontact, etc.), le paiement est capturé automatiquement
