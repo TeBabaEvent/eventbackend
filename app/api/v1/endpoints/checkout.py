@@ -235,7 +235,10 @@ async def create_checkout_session(
             return_url=f"{app_settings.frontend_url}/payment/complete?order={order.order_number}",
             cancel_url=f"{app_settings.frontend_url}/payment/complete?order={order.order_number}&status=cancelled",
             reference_id=order.order_number,
-            locale="fr-BE"  # Français Belgique
+            locale="fr-BE",
+            payer_email=order.customer_email,
+            payer_name=order.customer_name,
+            payer_phone=order.customer_phone
         )
 
         # 9. Sauvegarder l'ID de la commande PayPal
@@ -514,7 +517,10 @@ async def create_cart_checkout_session(
             return_url=f"{app_settings.frontend_url}/payment/complete?order={order.order_number}",
             cancel_url=f"{app_settings.frontend_url}/payment/complete?order={order.order_number}&status=cancelled",
             reference_id=order.order_number,
-            locale="fr-BE"  # Français Belgique
+            locale="fr-BE",
+            payer_email=order.customer_email,
+            payer_name=order.customer_name,
+            payer_phone=order.customer_phone
         )
 
         # 6. Sauvegarder l'ID de la commande PayPal

@@ -161,10 +161,13 @@ class PayPalPaymentClient:
         cancel_url: str,
         reference_id: str,
         custom_id: Optional[str] = None,
-        locale: str = "fr-BE"
+        locale: str = "fr-BE",
+        payer_email: Optional[str] = None,
+        payer_name: Optional[str] = None,
+        payer_phone: Optional[str] = None
     ) -> Dict[str, Any]:
         """
-        Crée une commande PayPal.
+        Crée une commande PayPal (mode redirect).
 
         Args:
             amount: Montant en EUR (ex: 25.00)
@@ -174,6 +177,9 @@ class PayPalPaymentClient:
             reference_id: Référence interne (order_number)
             custom_id: ID custom optionnel
             locale: Langue de la page de paiement
+            payer_email: Email du client (pour pré-remplir sur PayPal)
+            payer_name: Nom complet du client (pour pré-remplir sur PayPal)
+            payer_phone: Téléphone du client (pour pré-remplir sur PayPal)
 
         Returns:
             dict: {
@@ -199,28 +205,32 @@ class PayPalPaymentClient:
             }]
         }
 
-        # Si on n'est pas dans un flux JS SDK (qui gère ses propres sources), on force PayPal
-        # Pour le JS SDK, on omet payment_source pour laisser le choix (Card, PayPal, Bancontact, Apple Pay...)
-        # Ici on garde le comportement par défaut (redirect) sauf si return_url est vide/spécial?
-        # Mieux: on ajoute un paramètre à la fonction. 
-        # Mais pour minimiser l'impact, on va assumer que si return_url contient "payment/complete" (notre nouvelle page),
-        # On peut toujours fournir l'experience_context mais sans forcer "paypal"? 
-        # API v2: "payment_source" is optional.
-        
-        # Pour supporter Bancontact/Apple Pay via Smart Buttons, il ne faut PAS restreindre à "paypal".
-        # On va inclure payment_source SEULEMENT si on veut forcer le redirect PayPal classique.
-        # Mais nous migrons vers Smart Buttons.
-        # On va créer un payload "application_context" pour les URLs (legacy mais compatible) 
-        # OU utiliser payment_source.paypal.experience_context qui est la norme.
-        
-        # Si on utilise Smart Buttons, le frontend appelle createOrder.
-        # Le frontend peut passer les infos.
-        
-        # Pour simplicité : on ajoute l'experience_context au niveau racine (application_context) pour compatibilité,
-        # ou dans payment_source.paypal si on veut redirect.
-        
-        # CHANGEMENT: On met les URLs dans application_context (niveau racine) 
-        # et on enlève payment_source pour laisser le choix.
+        # Pré-remplir les informations du payeur si fournies
+        # Cela permet de pré-remplir les champs sur la page PayPal (Bancontact, carte, etc.)
+        if payer_email or payer_name or payer_phone:
+            payer_data = {}
+            if payer_email:
+                payer_data["email_address"] = payer_email
+            if payer_name:
+                # Séparer le nom en prénom/nom
+                name_parts = payer_name.strip().split(" ", 1)
+                payer_data["name"] = {
+                    "given_name": name_parts[0],
+                    "surname": name_parts[1] if len(name_parts) > 1 else name_parts[0]
+                }
+            if payer_phone:
+                # Nettoyer le numéro de téléphone (garder uniquement chiffres et +)
+                clean_phone = ''.join(c for c in payer_phone if c.isdigit() or c == '+')
+                if clean_phone:
+                    payer_data["phone"] = {
+                        "phone_type": "MOBILE",
+                        "phone_number": {
+                            "national_number": clean_phone.lstrip('+')
+                        }
+                    }
+            order_data["payer"] = payer_data
+
+        # Mode redirect : on utilise application_context pour les URLs de retour
         order_data["application_context"] = {
             "brand_name": "BABA Events",
             "locale": locale,
