@@ -5,8 +5,8 @@
     <title>Billet - {{ ticket.ticket_code }}</title>
     <style>
         /* ============================================
-           BABA EVENT - Single Ticket PDF
-           Professional Design with Large QR Code
+           BABA EVENT - Premium Ticket Design
+           Clean, Elegant & Professional
            ============================================ */
         
         @page {
@@ -51,22 +51,32 @@
         }
         
         /* ============================================
-           HEADER - Dark Branded
+           HEADER - Elegant Dark
            ============================================ */
         
         .header {
-            background: linear-gradient(135deg, #0a0a0f 0%, #1a1a20 100%);
-            padding: 20px 40px;
+            background: #0f0f0f;
+            padding: 24px 40px;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            border-bottom: 3px solid #dc143c;
             flex-shrink: 0;
         }
         
         .logo {
-            height: 60px;
+            height: 50px;
             width: auto;
+        }
+        
+        .logo-text {
+            font-size: 24pt;
+            font-weight: 800;
+            letter-spacing: 4px;
+            color: #ffffff;
+        }
+        
+        .logo-text span {
+            color: #e63946;
         }
         
         .header-right {
@@ -74,19 +84,20 @@
         }
         
         .header-label {
-            font-size: 9pt;
-            color: #808080;
+            font-size: 8pt;
+            color: #666666;
             text-transform: uppercase;
-            letter-spacing: 2px;
-            margin-bottom: 6px;
+            letter-spacing: 3px;
+            margin-bottom: 4px;
         }
         
         .ticket-number {
-            font-size: 12pt;
+            font-size: 11pt;
             color: #ffffff;
             font-family: monospace;
-            font-weight: 700;
+            font-weight: 600;
             letter-spacing: 1px;
+            opacity: 0.9;
         }
         
         /* ============================================
@@ -95,7 +106,7 @@
         
         .content {
             flex: 1;
-            padding: 25px 40px;
+            padding: 30px 50px;
             display: flex;
             flex-direction: column;
             overflow: hidden;
@@ -107,48 +118,50 @@
         
         .event-section {
             text-align: center;
-            padding-bottom: 20px;
-            border-bottom: 1px solid #e5e7eb;
+            padding-bottom: 25px;
             margin-bottom: 20px;
             flex-shrink: 0;
         }
         
         .event-title {
-            font-size: 26pt;
-            font-weight: 800;
+            font-size: 28pt;
+            font-weight: 700;
             color: #0f0f0f;
-            margin-bottom: 15px;
-            line-height: 1.15;
+            margin-bottom: 20px;
+            line-height: 1.2;
             letter-spacing: -0.5px;
         }
         
         .event-meta {
             display: flex;
             justify-content: center;
-            gap: 40px;
-            margin-top: 15px;
+            gap: 50px;
         }
         
         .meta-item {
             text-align: center;
+            padding: 12px 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            min-width: 140px;
         }
         
         .meta-label {
-            font-size: 9pt;
-            color: #9ca3af;
+            font-size: 8pt;
+            color: #6c757d;
             text-transform: uppercase;
-            letter-spacing: 1.5px;
+            letter-spacing: 2px;
             margin-bottom: 6px;
         }
         
         .meta-value {
-            font-size: 13pt;
+            font-size: 12pt;
             font-weight: 600;
-            color: #1f2937;
+            color: #212529;
         }
         
         /* ============================================
-           QR CODE SECTION - CENTERED & LARGE
+           QR CODE SECTION - CENTERED & ELEGANT
            ============================================ */
         
         .qr-section {
@@ -157,105 +170,131 @@
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            padding: 15px 0;
+            padding: 10px 0;
             min-height: 0;
         }
         
         .qr-container {
-            background: #fafafa;
-            border: 2px solid #e5e7eb;
-            border-radius: 16px;
-            padding: 25px;
             text-align: center;
         }
         
         .qr-wrapper {
             background: #ffffff;
-            padding: 15px;
-            border-radius: 12px;
-            border: 1px solid #e5e7eb;
+            padding: 20px;
+            border: 2px solid #e9ecef;
+            border-radius: 16px;
             display: inline-block;
-            margin-bottom: 15px;
+            margin-bottom: 16px;
         }
         
         .qr-image {
-            width: 180px;
-            height: 180px;
+            width: 160px;
+            height: 160px;
             display: block;
         }
         
         .scan-label {
-            font-size: 12pt;
-            color: #4b5563;
-            margin-bottom: 10px;
-            font-weight: 500;
+            font-size: 11pt;
+            color: #495057;
+            margin-bottom: 12px;
+            font-weight: 400;
+        }
+        
+        .ticket-code-wrapper {
+            display: inline-block;
+            background: #0f0f0f;
+            padding: 12px 28px;
+            border-radius: 6px;
         }
         
         .ticket-code {
             font-family: monospace;
-            font-size: 13pt;
+            font-size: 14pt;
             font-weight: 700;
-            color: #111827;
-            letter-spacing: 1px;
-            background: #f3f4f6;
-            padding: 10px 20px;
-            border-radius: 8px;
-            display: inline-block;
+            color: #ffffff;
+            letter-spacing: 2px;
         }
         
         /* ============================================
-           TICKET DETAILS
+           INFO NOTICE
+           ============================================ */
+        
+        .info-notice {
+            margin-top: 20px;
+            padding: 14px 24px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border-left: 3px solid #0f0f0f;
+        }
+        
+        .info-notice p {
+            color: #495057;
+            font-size: 10pt;
+            line-height: 1.5;
+            margin: 0;
+        }
+        
+        .info-notice strong {
+            color: #212529;
+            font-weight: 600;
+        }
+        
+        /* ============================================
+           TICKET DETAILS - Bottom Section
            ============================================ */
         
         .details-section {
             display: flex;
-            justify-content: center;
-            gap: 50px;
+            justify-content: space-between;
+            align-items: center;
             padding: 20px 0;
-            border-top: 1px solid #e5e7eb;
+            border-top: 1px solid #e9ecef;
             margin-top: auto;
             flex-shrink: 0;
         }
         
         .detail-box {
             text-align: center;
-            min-width: 120px;
+            flex: 1;
+        }
+        
+        .detail-box:not(:last-child) {
+            border-right: 1px solid #e9ecef;
         }
         
         .detail-label {
-            font-size: 9pt;
-            color: #9ca3af;
+            font-size: 8pt;
+            color: #6c757d;
             text-transform: uppercase;
-            letter-spacing: 1px;
+            letter-spacing: 1.5px;
             margin-bottom: 6px;
         }
         
         .detail-value {
             font-size: 12pt;
             font-weight: 600;
-            color: #1f2937;
+            color: #212529;
         }
         
         .pack-badge {
             display: inline-block;
-            background: #fef2f2;
-            color: #dc143c;
-            font-size: 11pt;
-            font-weight: 700;
-            padding: 8px 20px;
-            border-radius: 8px;
+            background: #0f0f0f;
+            color: #ffffff;
+            font-size: 10pt;
+            font-weight: 600;
+            padding: 8px 18px;
+            border-radius: 4px;
             text-transform: uppercase;
             letter-spacing: 1px;
         }
         
         /* ============================================
-           FOOTER
+           FOOTER - Minimal
            ============================================ */
         
         .footer {
-            background: #f9fafb;
-            border-top: 1px solid #e5e7eb;
-            padding: 15px 40px;
+            background: #f8f9fa;
+            padding: 14px 40px;
             flex-shrink: 0;
         }
         
@@ -265,49 +304,17 @@
             align-items: center;
         }
         
-        .footer-left {
-            font-size: 9pt;
-            color: #9ca3af;
+        .footer-left,
+        .footer-center,
+        .footer-right {
+            font-size: 8pt;
+            color: #6c757d;
+            letter-spacing: 0.5px;
         }
         
         .footer-center {
-            text-align: center;
-        }
-        
-        .footer-notice {
-            font-size: 9pt;
-            color: #6b7280;
             font-weight: 500;
-        }
-        
-        .footer-right {
-            font-size: 9pt;
-            color: #6b7280;
-            font-weight: 500;
-        }
-        
-        /* ============================================
-           INFO BOX
-           ============================================ */
-        
-        .info-box {
-            background: #f0fdf4;
-            border: 1px solid #bbf7d0;
-            border-left: 4px solid #22c55e;
-            border-radius: 8px;
-            padding: 12px 20px;
-            margin-top: 15px;
-            text-align: center;
-        }
-        
-        .info-text {
-            color: #166534;
-            font-size: 10pt;
-            line-height: 1.4;
-        }
-        
-        .info-text strong {
-            font-weight: 600;
+            color: #495057;
         }
     </style>
 </head>
@@ -318,10 +325,7 @@
             {% if logo_base64 %}
             <img class="logo" src="data:image/png;base64,{{ logo_base64 }}" alt="BABA Event">
             {% else %}
-            <div style="font-size: 22pt; font-weight: 800; letter-spacing: 3px;">
-                <span style="color: #ffffff;">BABA</span>
-                <span style="color: #dc143c;">EVENT</span>
-            </div>
+            <div class="logo-text">BABA<span>.</span></div>
             {% endif %}
             <div class="header-right">
                 <div class="header-label">Billet électronique</div>
@@ -351,20 +355,20 @@
                 </div>
             </section>
             
-            <!-- QR CODE - LARGE & CENTERED -->
+            <!-- QR CODE -->
             <section class="qr-section">
                 <div class="qr-container">
                     <div class="qr-wrapper">
                         <img class="qr-image" src="data:image/png;base64,{{ ticket.qr_base64 }}" alt="QR Code">
                     </div>
                     <div class="scan-label">Présentez ce QR code à l'entrée</div>
-                    <div class="ticket-code">{{ ticket.ticket_code }}</div>
+                    <div class="ticket-code-wrapper">
+                        <span class="ticket-code">{{ ticket.ticket_code }}</span>
+                    </div>
                 </div>
                 
-                <div class="info-box">
-                    <div class="info-text">
-                        <strong>Important :</strong> Ce billet est personnel et ne peut être utilisé qu'une seule fois.
-                    </div>
+                <div class="info-notice">
+                    <p><strong>Important :</strong> Ce billet est personnel et ne peut être utilisé qu'une seule fois.</p>
                 </div>
             </section>
             
@@ -389,13 +393,10 @@
         <footer class="footer">
             <div class="footer-content">
                 <div class="footer-left">© {{ current_year }} BABA Event • www.baba.events</div>
-                <div class="footer-center">
-                    <span class="footer-notice">Billet {{ ticket_index }} sur {{ total_tickets }}</span>
-                </div>
-                <div class="footer-right">Commande {{ order.order_number }}</div>
+                <div class="footer-center">Billet {{ ticket_index }} sur {{ total_tickets }}</div>
+                <div class="footer-right">{{ order.order_number }}</div>
             </div>
         </footer>
     </div>
 </body>
 </html>
-
