@@ -1,6 +1,6 @@
 """Routes d'administration pour la gestion des commandes et utilisateurs - Rate Limited"""
 from fastapi import APIRouter, HTTPException, Depends, Query, Request, status
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func, and_, or_
 from typing import Optional, List
 from datetime import datetime, date, timedelta, timezone
@@ -131,8 +131,11 @@ async def refund_order(
     """
     logger.info(f"Admin {admin.username} demande remboursement commande {order_id}")
 
-    # 1. Récupérer la commande
-    order = db.query(models.Order).filter(models.Order.id == order_id).first()
+    # 1. Récupérer la commande avec ses relations
+    order = db.query(models.Order).options(
+        joinedload(models.Order.items),
+        joinedload(models.Order.tickets)
+    ).filter(models.Order.id == order_id).first()
 
     if not order:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Commande non trouvée")
@@ -202,11 +205,30 @@ async def refund_order(
     # 4. Mettre à jour le statut de la commande ET annuler les tickets en une transaction
     try:
         order.status = "refunded"
-        
+
         # Annuler tous les tickets associés
         for ticket in order.tickets:
             ticket.status = "cancelled"
-        
+
+        # 4.1 Décrémenter sold_count pour libérer les places
+        if order.items and len(order.items) > 0:
+            # Commande multi-pack (cart)
+            for item in order.items:
+                event_pack = db.query(models.EventPack).filter(
+                    models.EventPack.event_id == item.event_id,
+                    models.EventPack.pack_id == item.pack_id
+                ).with_for_update().first()
+                if event_pack and event_pack.sold_count:
+                    event_pack.sold_count = max(0, event_pack.sold_count - item.quantity)
+        elif order.pack_id and order.quantity:
+            # Commande legacy single-pack
+            event_pack = db.query(models.EventPack).filter(
+                models.EventPack.event_id == order.event_id,
+                models.EventPack.pack_id == order.pack_id
+            ).with_for_update().first()
+            if event_pack and event_pack.sold_count:
+                event_pack.sold_count = max(0, event_pack.sold_count - order.quantity)
+
         db.commit()
         logger.info(f"Commande {order.order_number} remboursée via PayPal ({refund_amount} EUR)")
     except Exception as e:
