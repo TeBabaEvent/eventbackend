@@ -5,6 +5,7 @@ from datetime import datetime
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 # from fastapi.middleware.gzip import GZipMiddleware  # Disabled due to Python 3.14 bug
 from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi.exceptions import RequestValidationError
@@ -240,6 +241,19 @@ async def health_check():
             }
         )
 
+
+# ============================================
+# STATIC FILES - UPLOADS
+# ============================================
+from pathlib import Path
+
+# Create uploads directory and mount static files
+upload_dir = Path(settings.upload_dir)
+if not upload_dir.is_absolute():
+    upload_dir = Path(__file__).parent.parent / upload_dir
+upload_dir.mkdir(parents=True, exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=str(upload_dir)), name="uploads")
+logger.info(f"📁 Serving uploads from: {upload_dir}")
 
 # Inclure le router API v1
 app.include_router(api_router, prefix="/api")

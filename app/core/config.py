@@ -60,6 +60,11 @@ class Settings(BaseSettings):
     smtp_password: Optional[str] = None
     email_from_name: str = "BABA Event"
 
+    # File Upload Configuration
+    upload_dir: str = "uploads"  # Directory for uploaded files (relative to project root)
+    upload_max_size_mb: int = 10  # Maximum file size in MB
+    upload_base_url: str = "/uploads"  # URL prefix for serving uploaded files
+
     model_config = ConfigDict(
         env_file=".env",
         env_file_encoding='utf-8',
