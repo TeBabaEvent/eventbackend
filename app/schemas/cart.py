@@ -25,7 +25,7 @@ class CartCheckoutRequest(BaseModel):
     customer_name: str
     customer_email: EmailStr
     customer_phone: str | None = None
-    payment_method: str = "online"  # online, cash
+    payment_method: str = "online"  # online, cash, bank_transfer
     payment_source: str | None = None  # paypal, bancontact, card (for online payments)
 
     # GDPR Consent - Mandatory
@@ -41,8 +41,8 @@ class CartCheckoutRequest(BaseModel):
     @field_validator('payment_method')
     @classmethod
     def validate_payment_method(cls, v):
-        if v not in ['online', 'cash']:
-            raise ValueError('Méthode de paiement invalide. Utilisez "online" ou "cash"')
+        if v not in ['online', 'cash', 'bank_transfer']:
+            raise ValueError('Méthode de paiement invalide. Utilisez "online", "cash" ou "bank_transfer"')
         return v
 
     @field_validator('items')

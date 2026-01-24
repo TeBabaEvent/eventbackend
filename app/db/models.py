@@ -104,6 +104,11 @@ class Event(Base):
     instagram_reels_url = Column(Text, nullable=True)  # URL after movie Instagram Reels
     capacity = Column(Integer, nullable=True)
     status = Column(String(20), default="upcoming", index=True)  # upcoming, past, cancelled
+    allowed_payment_methods = Column(JSON, nullable=True)  # ["bancontact", "card", "paypal", "cash", "bank_transfer"] - null = all
+    # Bank transfer details (used when bank_transfer is in allowed_payment_methods)
+    bank_account_iban = Column(String(50), nullable=True)  # IBAN (ex: BE68 5390 0754 7034)
+    bank_account_name = Column(String(255), nullable=True)  # Account holder name
+    bank_account_bic = Column(String(20), nullable=True)  # BIC/SWIFT code
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     

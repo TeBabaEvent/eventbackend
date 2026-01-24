@@ -24,6 +24,11 @@ class EventBase(BaseModel):
     instagram_reels_url: Optional[str] = None
     capacity: Optional[int] = None
     status: str = "upcoming"
+    allowed_payment_methods: Optional[List[str]] = None  # ["bancontact", "card", "paypal", "cash", "bank_transfer"] - null = all
+    # Bank transfer details
+    bank_account_iban: Optional[str] = None
+    bank_account_name: Optional[str] = None
+    bank_account_bic: Optional[str] = None
 
 
 class EventCreate(EventBase):
@@ -48,6 +53,10 @@ class EventUpdate(BaseModel):
     instagram_reels_url: Optional[str] = None
     capacity: Optional[int] = None
     status: Optional[str] = None
+    allowed_payment_methods: Optional[List[str]] = None
+    bank_account_iban: Optional[str] = None
+    bank_account_name: Optional[str] = None
+    bank_account_bic: Optional[str] = None
     artists: Optional[List[EventArtistInfo]] = None
     packs: Optional[List[EventPackInfo]] = None
 

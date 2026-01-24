@@ -420,36 +420,44 @@ async def create_cart_checkout_session(
 
     logger.info(f"Commande panier créée: {order_number} - {len(validated_items)} packs - {total_amount_eur}€")
 
-    # 4.5. Gestion du paiement cash
-    if cart_request.payment_method == "cash":
-        logger.info(f"Réservation cash détectée: {order_number}")
-        
-        order.payment_method = "cash"
-        order.status = "pending_cash"  # Statut spécial pour les réservations cash
-        order.expires_at = None  # Pas d'expiration pour les réservations cash
+    # 4.5. Gestion du paiement cash ou virement bancaire
+    if cart_request.payment_method in ["cash", "bank_transfer"]:
+        payment_type = cart_request.payment_method
+        logger.info(f"Réservation {payment_type} détectée: {order_number}")
+
+        order.payment_method = payment_type
+        order.status = "pending_cash"  # Statut spécial pour les réservations en attente
+        order.expires_at = None  # Pas d'expiration pour ces réservations
         db.commit()
         db.refresh(order)
-        
-        # Envoyer l'email de réservation en attente (sans QR codes)
-        from app.services.email_service import send_pending_cash_reservation_email
-        
+
+        # Envoyer l'email approprié selon le type de paiement
         try:
-            await send_pending_cash_reservation_email(
-                to_email=order.customer_email,
-                customer_name=order.customer_name,
-                order=order
-            )
-            logger.info(f"Email réservation cash envoyé pour commande {order_number}")
+            if payment_type == "bank_transfer":
+                from app.services.email_service import send_pending_bank_transfer_reservation_email
+                await send_pending_bank_transfer_reservation_email(
+                    to_email=order.customer_email,
+                    customer_name=order.customer_name,
+                    order=order
+                )
+            else:
+                from app.services.email_service import send_pending_cash_reservation_email
+                await send_pending_cash_reservation_email(
+                    to_email=order.customer_email,
+                    customer_name=order.customer_name,
+                    order=order
+                )
+            logger.info(f"Email réservation {payment_type} envoyé pour commande {order_number}")
         except Exception as e:
-            logger.error(f"Erreur envoi email réservation cash: {e}")
-        
+            logger.error(f"Erreur envoi email réservation {payment_type}: {e}")
+
         # Retourner une réponse sans URL de paiement
         return CartCheckoutResponse(
             order_number=order.order_number,
             pay_url=f"{app_settings.frontend_url}/payment/complete?order={order.order_number}",
             amount=total_amount_eur,
             total_items=len(validated_items),
-            payment_method="cash",
+            payment_method=payment_type,
             is_pending_cash=True
         )
     
