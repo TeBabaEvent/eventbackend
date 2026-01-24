@@ -200,6 +200,11 @@ async def create_checkout_session(
 
         try:
             tickets = await generate_tickets_for_order(order, db)
+
+            # Marquer les tickets comme générés (évite les doublons via le recovery service)
+            order.tickets_generated = True
+            db.commit()
+
             pdf_paths = await generate_individual_ticket_pdfs(tickets, order)
             await send_confirmation_email(
                 to_email=order.customer_email,
@@ -484,6 +489,11 @@ async def create_cart_checkout_session(
 
         try:
             tickets = await generate_tickets_for_order(order, db)
+
+            # Marquer les tickets comme générés (évite les doublons via le recovery service)
+            order.tickets_generated = True
+            db.commit()
+
             pdf_paths = await generate_individual_ticket_pdfs(tickets, order)
             await send_confirmation_email(
                 to_email=order.customer_email,
@@ -719,6 +729,11 @@ async def capture_payment(
 
     try:
         tickets = await generate_tickets_for_order(order, db)
+
+        # Marquer les tickets comme générés (évite les doublons via le recovery service)
+        order.tickets_generated = True
+        db.commit()
+
         pdf_paths = await generate_individual_ticket_pdfs(tickets, order)
         await send_confirmation_email(
             to_email=order.customer_email,

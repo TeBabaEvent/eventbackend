@@ -342,7 +342,11 @@ async def mark_cash_reservation_paid(
         
         # 4. Générer les tickets
         tickets = await generate_tickets_for_order(order, db)
-        
+
+        # 4.5. Marquer les tickets comme générés (évite les doublons via le recovery service)
+        order.tickets_generated = True
+        db.commit()
+
         # 5. Générer les PDFs et envoyer l'email
         pdf_paths = await generate_individual_ticket_pdfs(tickets, order)
         
