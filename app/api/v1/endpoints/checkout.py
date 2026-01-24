@@ -604,6 +604,15 @@ def get_order_status(request: Request, order_number: str, db: Session = Depends(
 
     logger.info(f"📋 GET order {order_number}: status={order.status}, tickets_generated={order.tickets_generated}")
 
+    # For bank_transfer orders, include bank account details from the event
+    bank_account_info = {}
+    if order.payment_method == "bank_transfer" and order.event:
+        bank_account_info = {
+            "bank_account_iban": order.event.bank_account_iban,
+            "bank_account_name": order.event.bank_account_name,
+            "bank_account_bic": order.event.bank_account_bic
+        }
+
     return {
         "order_number": order.order_number,
         "status": order.status,
@@ -616,9 +625,11 @@ def get_order_status(request: Request, order_number: str, db: Session = Depends(
         "pack_items": order.pack_items_list,  # Détail des packs
         "customer_email": order.customer_email,
         "customer_name": order.customer_name,
+        "payment_method": order.payment_method,  # online, cash, or bank_transfer
         "tickets": tickets_data,
         "created_at": order.created_at.isoformat() if order.created_at else None,
-        "paid_at": order.paid_at.isoformat() if order.paid_at else None
+        "paid_at": order.paid_at.isoformat() if order.paid_at else None,
+        **bank_account_info
     }
 
 
