@@ -8,6 +8,7 @@ from app.db.database import get_db
 from app.db import models
 from app.schemas import artist as schemas
 from app.api.deps import require_admin
+from app.services.image_service import get_image_service
 
 logger = logging.getLogger(__name__)
 
@@ -90,7 +91,7 @@ def update_artist(
 
 
 @router.delete("/{artist_id}")
-def delete_artist(
+async def delete_artist(
     artist_id: str = Path(..., description="ID de l'artiste (UUID)", min_length=36, max_length=36),
     db: Session = Depends(get_db),
     _: None = Depends(require_admin)
@@ -99,9 +100,18 @@ def delete_artist(
     db_artist = db.query(models.Artist).filter(models.Artist.id == artist_id).first()
     if not db_artist:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Artiste non trouvé")
-    
+
     try:
         artist_name = db_artist.name
+
+        # Delete associated image file if it exists and is local
+        if db_artist.image_url:
+            image_service = get_image_service()
+            if image_service.is_local_image(db_artist.image_url):
+                deleted = await image_service.delete(db_artist.image_url)
+                if deleted:
+                    logger.info(f"🖼️ Image deleted for artist {artist_id}")
+
         db.delete(db_artist)
         db.commit()
         logger.info(f"🗑️ Artist deleted: {artist_name} (ID: {artist_id})")

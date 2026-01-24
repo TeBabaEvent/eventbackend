@@ -12,6 +12,7 @@ from app.schemas import event as schemas
 from app.api.deps import require_admin
 from app.utils.serializers import serialize_event
 from app.utils.slugify import generate_unique_slug
+from app.services.image_service import get_image_service
 
 logger = logging.getLogger(__name__)
 
@@ -293,7 +294,7 @@ def update_event(
 
 
 @router.delete("/{event_id}")
-def delete_event(
+async def delete_event(
     event_id: str = Path(..., description="ID de l'événement (UUID)", min_length=36, max_length=36),
     db: Session = Depends(get_db),
     _: None = Depends(require_admin)
@@ -302,9 +303,18 @@ def delete_event(
     db_event = db.query(models.Event).filter(models.Event.id == event_id).first()
     if not db_event:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Événement non trouvé")
-    
+
     try:
         event_title = db_event.title
+
+        # Delete associated image file if it exists and is local
+        if db_event.image_url:
+            image_service = get_image_service()
+            if image_service.is_local_image(db_event.image_url):
+                deleted = await image_service.delete(db_event.image_url)
+                if deleted:
+                    logger.info(f"🖼️ Image deleted for event {event_id}")
+
         db.delete(db_event)
         db.commit()
         logger.info(f"🗑️ Event deleted: {event_title} (ID: {event_id})")

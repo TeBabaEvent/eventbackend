@@ -99,7 +99,7 @@ class Event(Base):
     address = Column(String(500), nullable=True)
     city = Column(String(100), nullable=False)
     maps_embed_url = Column(Text, nullable=True)  # URL d'embed Google Maps
-    image_url = Column(Text, nullable=True)  # Text pour supporter les images base64
+    image_url = Column(Text, nullable=True)  # URL relative vers /uploads/ (ex: /uploads/events/xxx.webp ou /uploads/artists/xxx.webp)
     youtube_shorts_url = Column(Text, nullable=True)  # URL after movie YouTube Shorts
     instagram_reels_url = Column(Text, nullable=True)  # URL after movie Instagram Reels
     capacity = Column(Integer, nullable=True)
@@ -137,7 +137,7 @@ class Artist(Base):
     role_translations = Column(JSON, nullable=True)  # {"fr": "", "en": "", "nl": "", "sq": ""}
     description = Column(Text, nullable=True)
     description_translations = Column(JSON, nullable=True)  # {"fr": "", "en": "", "nl": "", "sq": ""}
-    image_url = Column(Text, nullable=True)  # Text pour supporter les images base64
+    image_url = Column(Text, nullable=True)  # URL relative vers /uploads/ (ex: /uploads/events/xxx.webp ou /uploads/artists/xxx.webp)
     events_count = Column(Integer, default=0)
     badge = Column(String(20), nullable=True)  # star, fire, premium
     instagram = Column(String(255), nullable=True)
