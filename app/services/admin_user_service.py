@@ -109,8 +109,17 @@ class AdminUserService:
         return user
     
     def delete_user(self, user: models.User) -> None:
-        """Supprime un utilisateur"""
+        """Supprime un utilisateur et ses données associées"""
         username = user.username
+
+        # Supprimer les scan_logs associés (steward_id ne peut pas être NULL)
+        scan_logs_count = self.db.query(models.ScanLog).filter(
+            models.ScanLog.steward_id == user.id
+        ).delete(synchronize_session=False)
+
+        if scan_logs_count > 0:
+            logger.info(f"🗑️ {scan_logs_count} scan_logs supprimés pour {username}")
+
         self.db.delete(user)
         self.db.commit()
         logger.info(f"🗑️ Utilisateur supprimé: {username}")
