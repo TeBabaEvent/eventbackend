@@ -3,7 +3,7 @@ Service de validation des scans de tickets
 Gère la validation des QR codes et le logging des scans
 """
 import jwt
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from sqlalchemy.orm import Session
 from typing import Optional, Dict, Any
 import logging
@@ -29,14 +29,47 @@ def decode_qr_jwt(qr_data: str) -> Dict[str, Any]:
         dict: Payload décodé du JWT
     
     Raises:
-        jwt.ExpiredSignatureError: Si le JWT est expiré
         jwt.InvalidTokenError: Si le JWT est invalide
     """
     return jwt.decode(
         qr_data,
         settings.jwt_secret_key,
-        algorithms=["HS256"]
+        algorithms=["HS256"],
+        options={"verify_exp": False}
     )
+
+
+def _compute_business_expiration(event: Event) -> Optional[datetime]:
+    """
+    Compute ticket expiration using event date/time business rules.
+
+    Rule: expires 24h after event datetime.
+    Fallback: if event time is invalid, use 00:00 on event date.
+    """
+    if not event or not event.date:
+        return None
+
+    try:
+        event_datetime = datetime.strptime(f"{event.date} {event.time}", "%Y-%m-%d %H:%M")
+    except (ValueError, TypeError):
+        try:
+            event_datetime = datetime.strptime(event.date, "%Y-%m-%d")
+            logger.warning(
+                f"Invalid event time ({event.time}) for event {event.id}, fallback to 00:00"
+            )
+        except (ValueError, TypeError):
+            logger.warning(f"Invalid event date ({event.date}) for event {event.id}")
+            return None
+
+    return event_datetime.replace(tzinfo=timezone.utc) + timedelta(days=1)
+
+
+def is_ticket_business_expired(event: Event) -> bool:
+    """Return True when ticket is expired by event date/time business rules."""
+    expiration = _compute_business_expiration(event)
+    if not expiration:
+        return False
+    return datetime.now(timezone.utc) > expiration
 
 
 def log_scan(
@@ -100,11 +133,12 @@ def validate_ticket_scan(
     Si un event_id est fourni en paramètre, il sert de vérification croisée optionnelle.
 
     Processus de validation:
-    1. Décoder et vérifier le JWT (signature, expiration)
+    1. Décoder et vérifier le JWT (signature)
     2. Vérifier que l'événement du ticket existe
-    3. Récupérer le ticket en DB avec verrouillage (évite race condition)
-    4. Vérifier le statut du ticket (valid, used, cancelled, expired)
-    5. Si valide: marquer comme utilisé et logger le succès
+    3. Vérifier l'expiration métier (date + heure + 24h)
+    4. Récupérer le ticket en DB avec verrouillage (évite race condition)
+    5. Vérifier le statut du ticket (valid, used, cancelled, expired)
+    6. Si valide: marquer comme utilisé et logger le succès
 
     Args:
         qr_data: Contenu du QR code (JWT signé)
@@ -136,22 +170,6 @@ def validate_ticket_scan(
         payload = decode_qr_jwt(qr_data)
         ticket_event_id = payload.get("event_id")
         ticket_event_name = payload.get("event_name")
-        
-    except jwt.ExpiredSignatureError:
-        # JWT expiré (événement passé depuis >24h)
-        logger.info(f"Scan: JWT expiré")
-        log_scan(db, None, qr_data, event_id, steward_id, "expired")
-        return {
-            "valid": False,
-            "result": "expired",
-            "message": "Ce billet a expiré",
-            "ticket": None,
-            "holder": None,
-            "pack_name": None,
-            "event_id": None,
-            "event_name": None
-        }
-
     except jwt.InvalidTokenError as e:
         # JWT invalide (falsifié, corrompu, mauvaise signature, etc.)
         logger.warning(f"Scan: JWT invalide - {type(e).__name__}: {e}")
@@ -198,8 +216,23 @@ def validate_ticket_scan(
             "event_id": ticket_event_id,
             "event_name": event.title
         }
+
+    # Expiration métier: 24h après date+heure de l'événement
+    if is_ticket_business_expired(event):
+        logger.info(f"Scan: Billet expiré (métier) - event={event.id}")
+        log_scan(db, None, qr_data, ticket_event_id, steward_id, "expired")
+        return {
+            "valid": False,
+            "result": "expired",
+            "message": "Ce billet a expiré",
+            "ticket": None,
+            "holder": None,
+            "pack_name": None,
+            "event_id": ticket_event_id,
+            "event_name": event.title
+        }
     
-    # ========== 3. RÉCUPÉRATION TICKET AVEC VERROUILLAGE ==========
+    # ========== 4. RÉCUPÉRATION TICKET AVEC VERROUILLAGE ==========
     ticket_code = payload.get("ticket_code")
     ticket_id = payload.get("ticket_id")
     
@@ -229,7 +262,7 @@ def validate_ticket_scan(
             "event_name": event.title
         }
     
-    # ========== 4. VÉRIFICATION STATUT DU TICKET ==========
+    # ========== 5. VÉRIFICATION STATUT DU TICKET ==========
     pack_name = payload.get("pack_name") or ticket.pack_name or "Standard"
     holder_name = ticket.holder_name or payload.get("holder") or "Invité"
     
@@ -279,7 +312,7 @@ def validate_ticket_scan(
             "event_name": event.title
         }
     
-    # ========== 5. SUCCÈS - MARQUER COMME UTILISÉ ==========
+    # ========== 6. SUCCÈS - MARQUER COMME UTILISÉ ==========
     ticket.status = "used"
     ticket.scanned_at = datetime.now(timezone.utc)
     ticket.scanned_by = steward_id
@@ -336,6 +369,15 @@ def get_ticket_info(qr_data: str, db: Session) -> Dict[str, Any]:
         ticket = db.query(Ticket).filter(Ticket.ticket_code == ticket_code).first()
         
         event = db.query(Event).filter(Event.id == payload.get("event_id")).first()
+
+        if event and is_ticket_business_expired(event):
+            return {
+                "valid": False,
+                "error": "expired",
+                "message": "Billet expiré",
+                "event_id": event.id,
+                "event_name": event.title
+            }
         
         return {
             "valid": True,
@@ -350,8 +392,6 @@ def get_ticket_info(qr_data: str, db: Session) -> Dict[str, Any]:
             "scanned_at": ticket.scanned_at.isoformat() if ticket and ticket.scanned_at else None
         }
         
-    except jwt.ExpiredSignatureError:
-        return {"valid": False, "error": "expired", "message": "Billet expiré"}
     except jwt.InvalidTokenError:
         return {"valid": False, "error": "invalid", "message": "QR code invalide"}
 
